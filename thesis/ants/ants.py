@@ -176,10 +176,10 @@ class Graph():
                     result.append(i)
         return result
 
-    def to_image(self,pixel_res = Interval(20,20),color_list = [Color(0.0),Color(1.0)]):
-        img = Image(pixel_res,color_list[0])
+    def to_image(self,pixel_res = Interval(20,20),color_dict = {0:Color(0.0),1:Color(1.0)}, default_color = Color(0.0)):
+        img = Image(pixel_res,default_color)
         for n, val in enumerate(self.prop):
-            img._pixels[n] = color_list[val]
+            img._pixels[n] = color_dict[val[0]]
         return img
 
 

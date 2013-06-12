@@ -6,28 +6,39 @@ from thesis.ants.ants import Graph
 from decodes.extensions.cellular_automata import CA
 import random
 
-
-prop_colors = (Color(0.0),Color(0,1,0),Color(0,.5,.5))
-state_list = ('undeveloped','green','built')
+prop_values = (0,1,2)
+prop_colors = (Color(1,1,1),Color(1,1,.5),Color(0))
+state_list = ('undeveloped','access','built')
 no_states = len(state_list)
+color_dict = dict(zip(prop_values,prop_colors))
+state_dict = dict(zip(prop_values, state_list))
+
+
 no_gen = 10
 
 
 import os
 path = os.path.expanduser("~") + os.sep + "_ants_export"
-f_prefix = "sobe_"
+f_prefix = "sobe_5_"
 
 sc = 1
 p = [1]
 m = 100
 n = 100
 w = False
+# p = .5 = sobe_2. p = .75 = sobe_3, p = .25 = sobe_4
+p_house = .25
 
-def a_count(v,a):
+def a_count(v,i,a):
     ret = 0
-    for i in a: 
-        if i == v : ret += 1
+    for j in a: 
+        if j[i] == v : ret += 1
     return ret
+
+
+def print_attributes(obj):
+    for attr in obj.__dict__:
+        print attr, getattr(obj, attr)
     
 
 ## this component will create a graph assuming an m x n grid of cells with a cell size of sc
@@ -88,13 +99,14 @@ for j in n_domain:
 props = []
 for i in range(m*n): 
     if random.uniform(0.0,1.0) < .01 :
-        props.append(1)
+        props.append([1,0,0])
     else:
-        props.append(0)
+        props.append([0,0,0])
 #    props.append(random.choice(range(no_states)))
 
 g_temp = []
 g_temp = Graph(neighbors,pts,cells,props)
+
 
 gen = 0
 h=[]
@@ -102,23 +114,27 @@ h.append(g_temp)
 
 # history loop
 while gen < no_gen:
-    img = h[gen].to_image(Interval(m,n),prop_colors)
+    img = h[gen].to_image(Interval(m,n),color_dict)
     img.save(f_prefix+str(gen), path, True)
-    new_props = (m*n)*[0]
+    new_props = []
+    for j in range(m*n): new_props.append([0,0,0])
     for i in range(m*n):
-        if h[gen].prop[i] == 0:
+        if h[gen].prop[i][0] == 0:
             n_temp = h[gen].n_props(i)
-            c_temp = a_count(1,n_temp)
+            c_temp = a_count(1,0,n_temp)
             if c_temp == 1:
-                new_props[i] = random.choice([1,2])
-            elif c_temp == 4:
-                new_props[i] = 1
+                if random.uniform(0.0,1.0) < p_house:
+                    new_props[i][0] = 2
+                else:
+                    new_props[i][0] = 1
             elif c_temp == 2:
-                new_props[i] = 1
+                new_props[i][0] = 1
             elif c_temp == 3:
-                new_props[i] = 2
+                new_props[i][0] = 2
+            elif c_temp == 4:
+                new_props[i][0] = 1
             else:
-                new_props[i] = 0
+                new_props[i][0] = 0
         else: new_props[i] = h[gen].prop[i]
     h.append(Graph(neighbors,pts,cells,new_props))
     gen+=1
