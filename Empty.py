@@ -7,6 +7,10 @@ from decodes.extensions.cellular_automata import CA
 import random
 import datetime
 
+import thesis.PIL as PIL
+from thesis.PIL import *
+
+
 prop_values = (0,1,2)
 prop_colors = (Color(1,1,1),Color(1,1,.5),Color(0))
 state_list = ('undeveloped','access','built')
