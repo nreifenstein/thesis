@@ -3,53 +3,35 @@ from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc
 import copy
 print "ants.py loaded"
 
+## define history class
+
+class History():
+    def __init__(self,_width=10,_height=10,_links=[]):
+        self.width = _width
+        self.height = _height
+        self.hist = self.rect_grid()
+
+    def rect_grid(self):
+        print "Rect_grid"
+        _links = []
+        _pts = []
+        _cells = []
+        _props = []
+        for i in range(self.width):
+            for j in range(self.height):
+                _links.append(1)
+                _pts.append([i,j,0])
+                _cells.append([1,1])
+                _props.append([0,0,0])
+        return [Graph(_links,_pts,_cells,_props)]
+
+    def add_gen(self):
+        self.hist.append(copy.copy(self.hist[-1]))
 
 
-## define array utility functions
-
-def a_add_like(a1,a2):
-    result = []
-    for i in range(min(len(a1),len(a2))):
-        result.append(a1[i]+a2[i])
-    return result
-
-def a_sub_like(a1,a2):
-    result = []
-    for i in range(min(len(a1),len(a2))):
-        result.append(a1[i]-a2[i])
-    return result
-
-def a_mult_like(a1,a2):
-    result = []
-    for i in range(min(len(a1),len(a2))):
-        result.append(a1[i]*a2[i])
-    return result
-
-def a_scalar(s,a1):
-    result = []
-    for i in range(len(a1)):
-        result.append(s*a1[i])
-    return result
-    
-def a_rem_dup(a1):
-    result = []
-    for i in range(len(a1)):
-        dup = False
-        for j in range(len(result)):
-            if a1[i] == result[j] : dup = True
-        if not dup : result.append(a1[i])
-    return result
-
-def a_count(v,a):
-    ret = 0
-    for i in a: 
-        if i == v : ret += 1
-    return ret
-    
 ## define graph class
-
 class Graph():
-    def __init__(self,_list,_pts,_cells,_props):
+    def __init__(self,_list=[],_pts=[],_cells=[],_props=[]):
         self.links = _list
         self.pts = _pts
         self.cell = _cells
@@ -222,3 +204,43 @@ def touch(p1,c1,p2,c2):
         return False
     else: return False
 
+    ## define array utility functions
+def a_add_like(a1,a2):
+    result = []
+    for i in range(min(len(a1),len(a2))):
+        result.append(a1[i]+a2[i])
+    return result
+
+def a_sub_like(a1,a2):
+    result = []
+    for i in range(min(len(a1),len(a2))):
+        result.append(a1[i]-a2[i])
+    return result
+
+def a_mult_like(a1,a2):
+    result = []
+    for i in range(min(len(a1),len(a2))):
+        result.append(a1[i]*a2[i])
+    return result
+
+def a_scalar(s,a1):
+    result = []
+    for i in range(len(a1)):
+        result.append(s*a1[i])
+    return result
+    
+def a_rem_dup(a1):
+    result = []
+    for i in range(len(a1)):
+        dup = False
+        for j in range(len(result)):
+            if a1[i] == result[j] : dup = True
+        if not dup : result.append(a1[i])
+    return result
+
+def a_count(v,a):
+    ret = 0
+    for i in a: 
+        if i == v : ret += 1
+    return ret
+    

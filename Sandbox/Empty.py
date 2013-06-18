@@ -1,7 +1,7 @@
 from decodes.core import *
 from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc_mesh, dc_pgon, dc_xform
 import thesis
-from thesis.ants.ants import Graph, History
+from thesis.ants.ants import Graph
 
 from decodes.extensions.cellular_automata import CA
 import random
@@ -10,12 +10,8 @@ import datetime
 import thesis.PIL as PIL
 from thesis.PIL import *
 
-t= History(20,20)
+t = History(20,20)
 print t
-t.add_gen()
-t.add_gen()
-print t.hist[0].pts
-print t.hist[1]
 
 prop_values = (0,1,2)
 prop_colors = (Color(1,1,1),Color(1,1,.5),Color(0))
