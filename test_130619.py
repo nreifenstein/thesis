@@ -121,11 +121,11 @@ fout.close()
 ### Main Function
 
 r = Graph()
-r.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=1)
-init_r = 99 * [0]
-init_r.append(1)
-
+r.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=100)
+init_r = [0,1,2]
 r.init_rvals([init_r])
+r.to_svg("svg_out6",color_dict)
+
 t= History(r)
 
 #execfile(base_path+rule_fname)

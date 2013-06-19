@@ -8,7 +8,7 @@ ymax = 500
 r = dc.core.PGon.rectangle(Point(xmax/2,ymax/2),xmax,ymax)
 
 for n in range(1):
-    outie = dc.makeOut(dc.Outies.SVG, "svg_"+str(n), canvas_dimensions=Interval(xmax,ymax), flip_y = True)
+    outie = dc.makeOut(dc.Outies.SVG, "svg_"+'%03d'%n, canvas_dimensions=Interval(xmax,ymax), flip_y = True)
     p.append(outie)
 
     scale = 50

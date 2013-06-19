@@ -1,5 +1,9 @@
+
+import decodes as dc
 from decodes.core import *
 from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc_mesh, dc_pgon, dc_xform
+#from decodes.io import *
+#from decodes.io import outie
 import copy
 print "ants.py loaded"
 import os
@@ -26,7 +30,7 @@ class Graph():
         # create neighbor list for standard rectangular cell grid
         for j in range(n):
             for i in range(m):
-                pts.append([cellhalf + cellsize*i,cellhalf+cellhalf*j,0])
+                pts.append([cellhalf + cellsize*i,cellhalf+cellsize*j,0])
                 cells.append([cellsize,cellsize,1])
                 k = i+j*m
                 n_new = []
@@ -208,6 +212,42 @@ class Graph():
         for n, val in enumerate(self.val):
             img._pixels[n] = color_dict[val[0]]
         return img
+
+    def to_svg(self,f_name="svg_out", color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), recs=True,nodes=False,links=False):
+        # Given a point list and a graph, construct the edges as lines
+        svg_out = dc.makeOut(dc.Outies.SVG, f_name, canvas_dimensions=cdim, flip_y = True)
+        lines = []
+        pts = []
+        pts2 = []   # total list, includes empty nodes - use for line list
+        recs = []
+        coord = self.pts
+        
+        for i in range(len(coord)): 
+            print "checking node ",i
+            p = Point(coord[i][0],coord[i][1],coord[i][2])
+            pts2.append(p)
+            if len(self.links[i]) > 0:
+                pts.append(p)
+                r = PGon.rectangle(p, self.cell[i][0], self.cell[i][1])
+                r.set_fill(color_dict[self.val[i][0]])
+                recs.append(r)
+
+                """
+        for i in list(range(len(coord))):
+            n = self.links[i]
+            for j in n:
+                if i < j:
+                    lines.append(Segment(pts2[i],pts2[j]))
+                    """
+        print "putting rectangles, ",
+        if recs : svg_out.put(recs)
+        print "edges, ",
+        if links : svg_out.put(lines)
+        print "nodes"
+        if nodes : svg_out.put(pts)
+        print "drawing tp file ",
+        svg_out.draw()
+        print "done"
 
 
 
