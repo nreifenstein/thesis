@@ -7,15 +7,17 @@ from decodes.extensions.cellular_automata import CA
 import random
 import datetime
 
-import thesis.PIL as PIL
-from thesis.PIL import *
+t= History()
 
-t= History(20,20)
-print t
 t.add_gen()
 t.add_gen()
-print t.hist[0].pts
-print t.hist[1]
+
+
+r = Graph()
+r.init_rectgrid(Interval(3,3),include_corners=False,wrap=False,cellsize=1)
+#r.init_rvals()
+# r.to_file()
+r.from_file()
 
 prop_values = (0,1,2)
 prop_colors = (Color(1,1,1),Color(1,1,.5),Color(0))

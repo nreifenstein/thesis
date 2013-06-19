@@ -2,47 +2,92 @@ from decodes.core import *
 from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc_mesh, dc_pgon, dc_xform
 import copy
 print "ants.py loaded"
-
-## define history class
-
-class History():
-    def __init__(self,_width=10,_height=10,_links=[]):
-        self.width = _width
-        self.height = _height
-        self.hist = self.rect_grid()
-
-    def rect_grid(self):
-        print "Rect_grid"
-        _links = []
-        _pts = []
-        _cells = []
-        _props = []
-        for i in range(self.width):
-            for j in range(self.height):
-                _links.append(1)
-                _pts.append([i,j,0])
-                _cells.append([1,1])
-                _props.append([0,0,0])
-        return [Graph(_links,_pts,_cells,_props)]
-
-    def add_gen(self):
-        self.hist.append(copy.copy(self.hist[-1]))
-
+import os
 
 ## define graph class
 class Graph():
-    def __init__(self,_list=[],_pts=[],_cells=[],_props=[]):
+    def __init__(self,_list=[],_pts=[],_cells=[],_vals=[]):
         self.links = _list
         self.pts = _pts
         self.cell = _cells
-        self.prop = _props
-        self._res = len(_props)
+        self.val = _vals
+        self._res = len(_vals)
+
+    def init_rectgrid(self,size=Interval(20,20),include_corners=False,wrap=False,cellsize=1):
+        self.size = size
+        m = size.a
+        n = size.b
+        cellhalf = cellsize/2
+        # initialize lists
+        pts = []
+        neighbors = []
+        cells = []
+
+        # create neighbor list for standard rectangular cell grid
+        for j in range(n):
+            for i in range(m):
+                pts.append([cellhalf + cellsize*i,cellhalf+cellhalf*j,0])
+                cells.append([cellsize,cellsize,1])
+                k = i+j*m
+                n_new = []
+                for di in [-1,0,1]:
+                    for dj in [-1,0,1]:
+                        if (abs(di)+abs(dj)) > 0:
+                            new_index = ((j+dj)%n)*m+((i+di)%m)
+                            if wrap :          # wrap is true
+                                if (di == 0) or (dj == 0): n_new.append(new_index)
+                                elif include_corners : n_new.append(new_index)
+                            else:           # wrap is false
+                                if ((i+di) in range(m)) and ((j+dj) in range(n)):
+                                    if (di == 0) or (dj == 0) : n_new.append(new_index)
+                                    elif include_corners : n_new.append(new_index)
+                neighbors.append(n_new)
+        self.links = neighbors
+        self.pts = pts
+        self.cell = cells
+        self.val = []
+        self._res = len(pts)
+
+    def init_rvals(self,choices=[[0,1]]):
+        v = []
+        for i in range(self._res):
+            vi = []
+            for j in choices:
+                vi.append(random.choice(j))
+            v.append(vi)
+        self.val = v
+
+    def to_file(self,fname=os.path.expanduser("~") + os.sep + 'out.txt'):
+#        import os
+#        path = os.path.expanduser("~") + os.sep + fname
+        print "writing to ",fname
+        fout = open(fname,'w')
+        fout.write(str(self.links)+'\n')
+        fout.write(str(self.pts)+'\n')
+        fout.write(str(self.val)+'\n')
+        fout.write(str(self.cell)+'\n')
+        fout.close()
+
+    def from_file(self,fname=os.path.expanduser("~") + os.sep + 'out.txt'):
+ #       path = os.path.expanduser("~") + os.sep + fname
+        print "reading from ",fname
+        fin = open(fname)
+        lines = []
+        for line in fin:
+            lines.append(line)
+        fin.close()
+        self.links = eval(lines[0])
+        self.pts = eval(lines[1])
+        self.val = eval(lines[2])
+        self.cell = eval(lines[3])
+
+
         
-    def addcell(self, _links, _pt, _cell,_prop):
+    def addcell(self, _links, _pt, _cell,_val):
         self.links.append(_links)
         self.pts.append(_pt)
         self.cell.append(_cell)
-        self.prop.append(_prop)
+        self.val.append(_val)
         return len(self.pts)-1
         
     def update(self):
@@ -99,7 +144,7 @@ class Graph():
         b1 = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(c2,v[(d+2)%4])))            # creates new base points
         b2 = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(c1,v[d])))
 
-        new_i = self.addcell([i],b2,c2,self.prop[i])                                                      # make new cells
+        new_i = self.addcell([i],b2,c2,self.val[i])                                                      # make new cells
         
         n = self.links[i]                   # get neighbors
         self.links[i] = [new_i]
@@ -132,35 +177,35 @@ class Graph():
         self.pts[i] = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(self.cell[j],v[d])))
         self.links[j] = []
         self.links[i] = n_new
-        self.prop[j]=DELETE
-        print "for cell ",j," :",self.links[j], self.prop[j]
+        self.val[j]=DELETE
+        print "for cell ",j," :",self.links[j], self.val[j]
         for k in n_new:
             if j in self.links[k] : self.links[k].remove(j)
         return True
         
-    def find(self,prop):
+    def find(self,val):
         result = []
-        for i in list(range(len(self.prop))):
-            if self.prop[i] == prop : result.append(i)
+        for i in list(range(len(self.val))):
+            if self.val[i] == val : result.append(i)
         return result
         
-    def n_props(self,c):
+    def n_vals(self,c):
         result = []
         for i in self.links[c]:
-            result.append(self.prop[i])
+            result.append(self.val[i])
         return result
         
-    def have_neighbor(self,mp,np):              # create list of cells with (1) props in mp and (2) neighbors with np
+    def have_neighbor(self,mp,np):              # create list of cells with (1) vals in mp and (2) neighbors with np
         result = []
-        for i in range(len(self.prop)):
-            if mp == self.prop[i]:
-                if np in self.n_props(i):
+        for i in range(len(self.val)):
+            if mp == self.val[i]:
+                if np in self.n_vals(i):
                     result.append(i)
         return result
 
     def to_image(self,pixel_res = Interval(20,20),color_dict = {0:Color(0.0),1:Color(1.0)}, default_color = Color(0.0)):
         img = Image(pixel_res,default_color)
-        for n, val in enumerate(self.prop):
+        for n, val in enumerate(self.val):
             img._pixels[n] = color_dict[val[0]]
         return img
 
@@ -238,9 +283,52 @@ def a_rem_dup(a1):
         if not dup : result.append(a1[i])
     return result
 
-def a_count(v,a):
+def a_count(v,i,a):
     ret = 0
-    for i in a: 
-        if i == v : ret += 1
+    for j in a: 
+        if j[i] == v : ret += 1
     return ret
-    
+
+
+## define history class
+
+class History():
+    def __init__(self,init_graph=Graph()):
+        self.hist = [init_graph]
+        self.rule_text = "default.txt"
+        self.param = []
+
+    def set_color_dict(self,_color_dict):
+        self.color_dict = _color_dict
+
+    def set_rule(self,_string="default.txt"):
+        self.rule_text = _string
+
+    def set_params(self,_param):
+        self.param = _param
+
+    def rule(self,n=0):
+        execfile(self.rule_text)
+
+    def generate(self,gen=1):
+        m = self.hist[0].size.a
+        n = self.hist[0].size.b
+        g = 1
+        while g < gen:
+            self.add_gen()
+            execfile(self.rule_text)
+#            self.hist[g].init_rvals()
+            g+=1
+
+    def write_images(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
+        size = self.hist[0].size
+        for i,g in enumerate(self.hist):
+            img = g.to_image(size,self.color_dict)
+            img.save(fname+str(i), base_path, True)
+
+    def test(self,n=0):
+        print self.hist[n]
+
+    def add_gen(self):
+        self.hist.append(copy.copy(self.hist[-1]))
+

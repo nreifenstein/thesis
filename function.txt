@@ -1,0 +1,1 @@
+self.hist[g].init_rvals()
