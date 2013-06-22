@@ -42,6 +42,7 @@ path = os.path.expanduser("~") + os.sep + "_ants_export"
 name = "sobe_5"
 base_path = "F:\\2013 Summer\\Thesis\\_ants"+"\\"
 init_fname = ""
+out_fname = ""
 rule_fname = "default.txt"
 
 lines = []
@@ -80,6 +81,9 @@ for line in fin:
     if switch == "i":
         init_fname = arg.strip()
         print "looking for initial conditions in ", init_fname
+    if switch == "o":
+        out_fname = arg.strip()
+        print "writing initial conditions in ", out_fname
     if switch == "r":
         rule_fname = arg.strip()
         print "rules loaded from ", rule_fname
@@ -88,7 +92,7 @@ fin.close()
 
 # Create the directory if it doesn't already exist
 f_prefix = name+"_"
-f_name = f_prefix+"_"+str(m)+"x"+'%03d'%n+"_"+str(int(param[1]*100))
+f_name = f_prefix+'%03d'%m+"x"+'%03d'%n+"_"+str(int(param[1]*100))
 path =base_path+f_name
 if not( os.path.exists(path)):
     os.mkdir(path)
@@ -105,11 +109,23 @@ fout.close()
 ### Main Function
 
 r = Graph()
-r.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=1)
-init_r = 19 * [0] + [1]
+if init_fname == "":
+    r.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=1)
+    init_r = 30 * [0]
+    init_r[0] = 1
+    r.init_rvals([init_r])
+else:
+    r.from_csv(init_fname,base_path)
+
+if out_fname != "":
+    r.to_csv(out_fname,base_path)
+
 #init_r = [0,1,2]
-r.init_rvals([init_r])
+#r.init_rvals([init_r])
+#r.to_csv(f_name,path)
 #r.to_svg("svg_out11",color_dict,cdim=Interval(1000,1000))
+
+#r.from_csv("test",path)
 
 t= History(r)
 

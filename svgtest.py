@@ -12,17 +12,18 @@ for n in range(1):
     p.append(outie)
 
     scale = 50
-
+    print "putting ...",
     p[n].put(r)
-
+    print "done"
     for x in range(10):
         for y in range(10):
             pt = Point(x*scale,y*scale)
             pt.set_color(Color(1,0,0))
             pt.set_weight(2*y+1.5)
             p[n].put(pt)
+    print "drawing ...",
     p[n].draw()
-
+    print "done"
         
 '''   
 def func(t):

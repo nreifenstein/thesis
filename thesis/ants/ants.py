@@ -4,14 +4,14 @@ from decodes.core import *
 from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc_mesh, dc_pgon, dc_xform
 #from decodes.io import *
 #from decodes.io import outie
-import copy
+import copy, csv
 print "ants.py loaded"
-import os
+import os,cStringIO
 
 ## define graph class
 class Graph():
     def __init__(self,_list=[],_pts=[],_cells=[],_vals=[]):
-        self.links = _list
+        self.link = _list
         self.pts = _pts
         self.cell = _cells
         self.val = _vals
@@ -46,7 +46,7 @@ class Graph():
                                     if (di == 0) or (dj == 0) : n_new.append(new_index)
                                     elif include_corners : n_new.append(new_index)
                 neighbors.append(n_new)
-        self.links = neighbors
+        self.link = neighbors
         self.pts = pts
         self.cell = cells
         self.val = []
@@ -66,7 +66,7 @@ class Graph():
 #        path = os.path.expanduser("~") + os.sep + fname
         print "writing to ",fname
         fout = open(fname,'w')
-        fout.write(str(self.links)+'\n')
+        fout.write(str(self.link)+'\n')
         fout.write(str(self.pts)+'\n')
         fout.write(str(self.val)+'\n')
         fout.write(str(self.cell)+'\n')
@@ -80,27 +80,27 @@ class Graph():
         for line in fin:
             lines.append(line)
         fin.close()
-        self.links = eval(lines[0])
+        self.link = eval(lines[0])
         self.pts = eval(lines[1])
         self.val = eval(lines[2])
         self.cell = eval(lines[3])
 
 
         
-    def addcell(self, _links, _pt, _cell,_val):
-        self.links.append(_links)
+    def addcell(self, _link, _pt, _cell,_val):
+        self.link.append(_link)
         self.pts.append(_pt)
         self.cell.append(_cell)
         self.val.append(_val)
         return len(self.pts)-1
         
     def update(self):
-        for i in range(len(self.links)): self.links[i] = []
-        for i in range(len(self.links)-1):
-            for j in range(i+1,len(self.links)):
+        for i in range(len(self.link)): self.link[i] = []
+        for i in range(len(self.link)-1):
+            for j in range(i+1,len(self.link)):
                 if touch(self.pts[i],self.cell[i],self.pts[j],self.cell[j]):
-                    self.links[i].append(j)
-                    self.links[j].append(i)
+                    self.link[i].append(j)
+                    self.link[j].append(i)
                     
     def direction(self,i,j):
         p1 = self.pts[i]
@@ -150,16 +150,16 @@ class Graph():
 
         new_i = self.addcell([i],b2,c2,self.val[i])                                                      # make new cells
         
-        n = self.links[i]                   # get neighbors
-        self.links[i] = [new_i]
+        n = self.link[i]                   # get neighbors
+        self.link[i] = [new_i]
         self.pts[i] = b1
         self.cell[i] = c1
         for j in n:
-            if i in self.links[j] : self.links[j].remove(i)
+            if i in self.link[j] : self.link[j].remove(i)
             for k in [i,new_i]:
                 if self.neighbor(j,k):
-                    self.links[j].append(k)
-                    self.links[k].append(j)
+                    self.link[j].append(k)
+                    self.link[k].append(j)
         return True
         
         
@@ -172,19 +172,19 @@ class Graph():
             if (abs(self.pts[i][k]-self.pts[j][k]) < EPSILON) and (self.cell[i][k] == self.cell[j][k]): test = True
         if not(test) : return False                     # not same h/w
         print i,j," can be combined"
-        n_new = a_rem_dup(self.links[i]+self.links[j])
+        n_new = a_rem_dup(self.link[i]+self.link[j])
         if i in n_new : n_new.remove(i)
         if j in n_new : n_new.remove(j)
         d = direction(self.pts[j],self.pts[i])
         if d%2 == 0: self.cell[i][0]+=self.cell[j][0]
         else: self.cell[i][1]+=self.cell[j][1]
         self.pts[i] = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(self.cell[j],v[d])))
-        self.links[j] = []
-        self.links[i] = n_new
+        self.link[j] = []
+        self.link[i] = n_new
         self.val[j]=DELETE
-        print "for cell ",j," :",self.links[j], self.val[j]
+        print "for cell ",j," :",self.link[j], self.val[j]
         for k in n_new:
-            if j in self.links[k] : self.links[k].remove(j)
+            if j in self.link[k] : self.link[k].remove(j)
         return True
         
     def find(self,val):
@@ -195,7 +195,7 @@ class Graph():
         
     def n_vals(self,c):
         result = []
-        for i in self.links[c]:
+        for i in self.link[c]:
             result.append(self.val[i])
         return result
         
@@ -213,9 +213,9 @@ class Graph():
             img._pixels[n] = color_dict[val[0]]
         return img
 
-    def to_svg(self,f_name="svg_out", color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), recs=True,nodes=False,links=False):
-        # Given a point list and a graph, construct the edges as lines
-        svg_out = dc.makeOut(dc.Outies.SVG, f_name, canvas_dimensions=cdim, flip_y = True)
+    def to_dc_svg(self,f_name="svg_out", color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
+        # this uses Decodes. OK for nodes and link, slow for cells.
+        svg_out = dc.makeOut(dc.Outies.SVG, f_name, canvas_dimensions=cdim, flip_y = False)
         lines = []
         pts = []
         pts2 = []   # total list, includes empty nodes - use for line list
@@ -223,33 +223,134 @@ class Graph():
         coord = self.pts
         
         for i in range(len(coord)): 
-            print "checking node ",i
+#            print "checking node ",i
             p = Point(coord[i][0],coord[i][1],coord[i][2])
             pts2.append(p)
-            if len(self.links[i]) > 0:
+            if len(self.link[i]) > 0:
+                if draw_nodes:
+                    p.set_color(Color(0.0))
+                    p.set_weight(self.cell[i][0]*.1)
                 pts.append(p)
-                r = PGon.rectangle(p, self.cell[i][0], self.cell[i][1])
-                r.set_fill(color_dict[self.val[i][0]])
-                recs.append(r)
+                if draw_recs:
+                    r = PGon.rectangle(p, self.cell[i][0], self.cell[i][1])
+                    r.set_color(color_dict[self.val[i][0]])
+                    recs.append(r)
 
-                """
-        for i in list(range(len(coord))):
-            n = self.links[i]
-            for j in n:
-                if i < j:
-                    lines.append(Segment(pts2[i],pts2[j]))
-                    """
+        if draw_link :
+            for i in list(range(len(coord))):
+                n = self.link[i]
+                for j in n:
+                    if i < j:
+                        line = Segment(pts2[i],pts2[j])
+                        line.set_color(Color(0.0))
+                        lines.append(line)
+
         print "putting rectangles, ",
-        if recs : svg_out.put(recs)
+        if draw_recs : svg_out.put(recs)
         print "edges, ",
-        if links : svg_out.put(lines)
+        if draw_link : svg_out.put(lines)
         print "nodes"
-        if nodes : svg_out.put(pts)
+        if draw_nodes : svg_out.put(pts)
         print "drawing tp file ",
         svg_out.draw()
         print "done"
 
+    def to_csv(self,f_name="in",f_path= os.path.expanduser("~")):
+        filepath = f_path + os.sep + f_name+".csv"
+        print "saving graph to "+filepath
+        no_vals = len(self.val[0])
+        fout = open(filepath,"w")
+        fout.write(str(self.size.a)+','+str(self.size.b)+','+str(no_vals)+'\n')
+        fout.write('cell,base,,,values'+no_vals*','+'size,,,link\n')
 
+        for i in range(len(self.pts)):
+            vals = [i]
+            vals.extend(self.pts[i])
+            vals.extend(self.val[i])
+            vals.extend(self.cell[i])
+            vals.extend(self.link[i])
+            out_string = ",".join([str(v) for v in vals])
+            fout.write(out_string+'\n')
+        fout.close()
+
+    def from_csv(self,f_name="out",f_path=os.path.expanduser("~")):
+        filepath = f_path + os.sep + f_name+".csv"
+        print "reading graph from "+filepath
+        pts = []
+        val = []
+        cell = []
+        link = []
+        with open(filepath, 'rb') as f:
+            reader = csv.reader(f)
+            for n, row in enumerate(reader):
+#                print n,row
+                if n == 0:
+                    no_vals = int(row[2])
+                    u = no_vals+4
+                    self.size = Interval(int(row[0]),int(row[1]))
+                if n > 1:
+                    pts.append([float(row[1]),float(row[2]),float(row[3])])
+
+                    v = []
+                    for i in range(4,u): v.append(int(row[i]))
+                    val.append(v)
+                    c = []
+                    for i in range(u,u+3): c.append(float(row[i]))
+                    cell.append(c)
+
+                    j = u+3
+                    flag = True
+                    lin = []
+                    while j < len(row) and flag:
+                        if row[j] <> "":
+                            lin.append(int(row[j]))
+                            j+=1
+                        else:
+                            break
+                    link.append(lin)
+
+        self.pts = pts
+        self.val = val
+        self.cell = cell
+        self.link = link
+        self._res = len(val)
+
+
+    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)}):
+        # quick and dirty svg writer
+        filepath = f_path + os.sep + f_name+".svg"
+
+        c = min(cdim.a/self.size.a,cdim.b/self.size.b)
+        print "drawing svg to "+filepath
+
+        buffer = cStringIO.StringIO()
+        svg_size = ""
+        svg_size = 'width="'+str(1000)+'" height="'+str(1000)+'"'
+
+        buffer.write('<svg '+svg_size+' xmlns="http://www.w3.org/2000/svg" version="1.1">\n')
+
+        type = 'polygon'
+
+        for k in range(self._res):
+            dx = c * self.cell[k][0]/2
+            dy = c * self.cell[k][1]/2
+            px = c * self.pts[k][0]
+            py = c * self.pts[k][1]
+            pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
+            col = color_dict[self.val[k][0]]
+            style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:0;stroke:none'
+            point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
+            atts = 'points="'+point_string+'"'
+            buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
+
+
+        buffer.write('</svg>')
+
+        # write buffer to file
+        fo = open(filepath, "wb")
+        fo.write( buffer.getvalue() )
+        fo.close()
+        buffer.close()
 
 
 
@@ -365,6 +466,44 @@ class History():
         for i,g in enumerate(self.hist):
             img = g.to_image(size,self.color_dict)
             img.save(fname+str(i), base_path, True)
+
+    def write_svgs(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
+        size = Interval(500,500)
+        for i,g in enumerate(self.hist):
+            g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict)
+
+    def write_animated_svgs(self, f_name="out", f_path=os.path.expanduser("~") + os.sep):
+        filepath = f_path + os.sep + f_name+".svg"
+        dur = 1
+        size = Interval(500,500)
+        for i,g in enumerate(self.hist):
+            g.to_svg(f_name+str(i), f_path,size,self.color_dict)
+
+        buffer = cStringIO.StringIO()
+        svg_size = ""
+        svg_size = 'width="'+str(1000)+'" height="'+str(1000)+'"'
+
+        buffer.write('<svg '+svg_size+' xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">\n')
+        
+        for i in range(len(self.hist)):
+            buffer.write('<image '+svg_size+' xlink:href="'+f_name+str(i)+'.svg">\n')
+            values = len(self.hist) * ["none"]
+            values[i] = "inline"
+            v_string = ";".join(values)
+            line_string ="<animate id='frame_"+str(i)+"' attributeName='display' values='"+v_string+"'"
+            line_string = line_string + " dur = '"+str(dur)+"s' fill='freeze' begin='"+str(i*dur)+"s' repeatCount='indefinite' />\n"
+            buffer.write(line_string)
+            buffer.write('</image>\n')
+       
+
+        buffer.write('</svg>')
+
+        # write buffer to file
+        fo = open(filepath, "wb")
+        fo.write( buffer.getvalue() )
+        fo.close()
+        buffer.close()
+
 
     def test(self,n=0):
         print self.hist[n]
