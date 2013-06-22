@@ -21,7 +21,7 @@ class Graph():
         self.size = size
         m = size.a
         n = size.b
-        cellhalf = cellsize/2
+        cellhalf = cellsize/2.0
         # initialize lists
         pts = []
         neighbors = []
@@ -60,6 +60,25 @@ class Graph():
                 vi.append(random.choice(j))
             v.append(vi)
         self.val = v
+
+    def init_block(self, model_size=Interval(40,40), block_size=Interval(20,20), init_val = 1, prob = 50):
+        mod_x = block_size.a + 1
+        mod_y = block_size.b + 1
+        c_x = (model_size.a + block_size.a) / 2
+        c_y = (model_size.b + block_size.b) / 2
+        v = []
+
+        for i in range(model_size.a):
+            for j in range(model_size.b):
+                k = i+j*model_size.a
+                if ((i-c_y) % mod_y == 0) or ((j-c_x) % mod_x == 0):
+                    v.append([1])
+                else:
+                    v.append([0])
+
+        self.val = v
+
+
 
     def to_file(self,fname=os.path.expanduser("~") + os.sep + 'out.txt'):
 #        import os
@@ -193,7 +212,7 @@ class Graph():
             if self.val[i] == val : result.append(i)
         return result
         
-    def n_vals(self,c):
+    def n_vals(self,c):                         # create list of the values of the neighbors of c
         result = []
         for i in self.link[c]:
             result.append(self.val[i])
@@ -325,7 +344,7 @@ class Graph():
 
         buffer = cStringIO.StringIO()
         svg_size = ""
-        svg_size = 'width="'+str(1000)+'" height="'+str(1000)+'"'
+        svg_size = 'width="'+str(cdim.a)+'" height="'+str(cdim.b)+'"'
 
         buffer.write('<svg '+svg_size+' xmlns="http://www.w3.org/2000/svg" version="1.1">\n')
 
@@ -424,7 +443,7 @@ def a_rem_dup(a1):
         if not dup : result.append(a1[i])
     return result
 
-def a_count(v,i,a):
+def a_count(v,i,a):                     # searches list a, finds value v in sublist # i
     ret = 0
     for j in a: 
         if j[i] == v : ret += 1
@@ -467,10 +486,30 @@ class History():
             img = g.to_image(size,self.color_dict)
             img.save(fname+str(i), base_path, True)
 
-    def write_svgs(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
-        size = Interval(500,500)
+    def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500),state_dict=dict()):
         for i,g in enumerate(self.hist):
             g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict)
+        if len(state_dict) != 0:
+            print "writing to ",fname+"_m.csv"
+            np = len(state_dict)
+            fout = open(base_path + os.sep + fname+"_m.csv",'w')
+            out_string = ",".join(['generation']+state_dict.values())
+            fout.write(out_string+'\n')
+            for i,g in enumerate(self.hist):
+                v = np * [0]
+                for j in g.val:
+                    v[j[0]%np]+=1
+                out_string = ",".join([str(n) for n in [i]+v])
+                fout.write(out_string+'\n')
+            fout.close()
+        print "writing to ",fname+".bat"
+        fout = open(base_path + os.sep + fname+".bat",'w')
+        fout.write('cd '+base_path + '\n')
+        fout.write('convert -delay 40 -loop 0 *.svg '+fname+'.gif\n')
+        fout.write(fname+'.gif\n')
+ #       fout.write('pause\n')
+        fout.close()
+ #       return base_path + os.sep + fname+".bat"
 
     def write_animated_svgs(self, f_name="out", f_path=os.path.expanduser("~") + os.sep):
         filepath = f_path + os.sep + f_name+".svg"

@@ -33,7 +33,10 @@ w = False
 # p = .5 = sobe_2. p = .75 = sobe_3, p = .25 = sobe_4
 param = []
 for i in range(10): param.append(0)
-param[1] = .25
+param[0] = 25                           # inital probability
+param[7] = (40,40)                      # model size
+param[8] = 0                            # block size
+param[9] = (400,400)                    # display size
 no_gen = 10
 
 
@@ -46,7 +49,7 @@ out_fname = ""
 rule_fname = "default.txt"
 
 lines = []
-fin = open(base_path+'batch.txt')
+fin = open(base_path+'setup.txt')
 for line in fin:
     lines.append(line)
     tokens = line.split("=")
@@ -72,9 +75,11 @@ for line in fin:
     if switch == 'g':
         no_gen = eval(arg)
         print "No of generations = ",arg
-    if switch == 'p1':
-        param[1] = eval(arg)/100.0
-        print "Param 1 =",param[1],arg
+    if switch != "" and switch[0] == 'p':
+        t = eval(switch[1:])
+        t = t % 10
+        param[t] = eval(arg)
+        print "Param "+str(t)+" =",param[t],arg
     if switch == 's':
         random.seed(eval(arg))
         print "random seed set to ", eval(arg)
@@ -89,10 +94,18 @@ for line in fin:
         print "rules loaded from ", rule_fname
 fin.close()
 
+# convert param list to working params
+model_size = Interval(param[7][0],param[7][1])
+if param[8] != 0:
+    block_size = Interval(param[8][0],param[8][1])
+else:
+    block_size = Interval(0,0)
+display_size = Interval(param[9][0],param[9][1])
+
 
 # Create the directory if it doesn't already exist
 f_prefix = name+"_"
-f_name = f_prefix+'%03d'%m+"x"+'%03d'%n+"_"+str(int(param[1]*100))
+f_name = f_prefix+'%03d'%model_size.a+"x"+'%03d'%model_size.b+"_"+str(param[0])
 path =base_path+f_name
 if not( os.path.exists(path)):
     os.mkdir(path)
@@ -110,10 +123,14 @@ fout.close()
 
 r = Graph()
 if init_fname == "":
-    r.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=1)
-    init_r = 30 * [0]
-    init_r[0] = 1
-    r.init_rvals([init_r])
+    r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
+    if block_size.a == 0:
+        init_r = 30 * [0]
+        init_r[0] = 1
+        r.init_rvals([init_r])
+    else:
+        r.init_block(model_size,block_size, param[0])
+    r.to_csv(f_name,path)
 else:
     r.from_csv(init_fname,base_path)
 
@@ -142,8 +159,7 @@ t.set_params(param)
 t.generate(no_gen)
 
 t.set_color_dict(prop_colors)
-t.write_svgs(f_name,path)
-
+t.write_svgs(f_name,path, display_size,state_dict)
 
 
 def a_count(v,i,a):
