@@ -474,11 +474,13 @@ class History():
         m = self.hist[0].size.a
         n = self.hist[0].size.b
         g = 1
+        init_props = []
+        for j in range(m*n): init_props.append([self.hist[0].val[j][0]])
         while g < gen:
             self.add_gen()
             execfile(self.rule_text)
-#            self.hist[g].init_rvals()
             g+=1
+        self.hist[0].val = init_props
 
     def write_images(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
         size = self.hist[0].size

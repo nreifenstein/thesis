@@ -8,15 +8,18 @@ import random
 import datetime
 import cPickle
 
-
+"""
 
 prop_values = (0,1,2,3)
-prop_colors = (Color(1,1,1),Color(248.0/255.0,219/255.0,148/255.0),Color(243/255.0,172/255.0,113/255.0),Color(65/255.0,65/255.0,65/255.0))
+prop_colors = (Color(1,1,1),Color(248.0/255.0,219/255.0,148/255.0),Color(243/255.0,172/255.0,113/255.0),Color(237/255.0,28/255.0,36/255.0))
 state_list = ('undeveloped','streets','access','built')
 no_states = len(state_list)
 color_dict = dict(zip(prop_values,prop_colors))
 state_dict = dict(zip(prop_values, state_list))
+"""
 
+names =('undeveloped')
+colors = ((0,0,0))
 
 def fun(self,n):
     print self.hist[n]
@@ -59,10 +62,16 @@ for line in fin:
     else:
         switch = ''
         arg = ''
-    print switch, arg
+#    print switch, arg
     if switch == 'b':
         base_path = arg
         print "path = ",arg
+    if switch == 'c':
+        colors = eval(arg)
+        print "colors = ", colors
+    if switch == 'n':
+        names = eval(arg)
+        print "names = ",names
     if switch == 'f':
         name = arg
         print "name = ",arg
@@ -101,6 +110,16 @@ if param[8] != 0:
 else:
     block_size = Interval(0,0)
 display_size = Interval(param[9][0],param[9][1])
+
+# set up colors and states
+no_states = min(len(names),len(colors))
+prop_values = range(no_states)
+prop_colors = []
+for c in colors:
+    prop_colors.append(Color(c[0]/255.0,c[1]/255.0,c[2]/255.0))
+
+color_dict = dict(zip(prop_values,prop_colors))
+state_dict = dict(zip(prop_values,names))
 
 
 # Create the directory if it doesn't already exist
