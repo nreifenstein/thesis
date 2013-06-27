@@ -478,9 +478,78 @@ class History():
         for j in range(m*n): init_props.append([self.hist[0].val[j][0]])
         while g < gen:
             self.add_gen()
-            execfile(self.rule_text)
+#            execfile(self.rule_text)
+
+            # modified 06.23.2013 to create distinct first generation
+            # modified 06.26.2013 to create incremental additions
+            print ".",
+            prob = self.param[0] / 100.0
+#            for j in range(m*n): new_props.append([0,0])
+
+
+            if g == 1:
+                b_sites = []
+                a_sites = []
+                for i in range(m*n):
+                    if self.hist[g].val[i][0] == 0:         
+                        n_temp = self.hist[g].n_vals(i)
+         
+                        a_temp = a_count(1,0,n_temp)
+                        b_temp = a_count(2,0,n_temp)
+                        if a_temp > 0:
+                            if a_temp >1 : 
+                                self.hist[g].val[i][0] = 3
+                    
+                            elif b_temp == 0:
+                                if random.uniform(0.0,1.0) < prob: 
+                                    self.hist[g].val[i][0] = 3
+                                else: self.hist[g].val[i][0] = 2                
+                            else: self.hist[g].val[i][0] = 3
+                        else: self.hist[g].val[i][0] = 0
+                    else: t = 1
+                    if self.hist[g].val[i][0] == 3:
+                        if i == 687:
+                            raw_input("press enter...")
+                        if not(i in b_sites) : b_sites.append(i)
+                        if i in a_sites : a_sites.remove(i)
+                    if self.hist[g].val[i][0] == 2:
+                        n_temp = self.hist[g].link[i]
+                        for j in n_temp:
+                            if self.hist[g].val[j][0] == 0: 
+                                if not(j in b_sites) : b_sites.append(j)
+                                if not(j in a_sites) : a_sites.append(j)
+            if g > 1: 
+                if g > 43:
+                    print '.'
+                new_props = []
+                for j in range(m*n): new_props.append(copy.copy(self.hist[g].val[j]))
+                print "generation = ",g,"  /",
+                if random.uniform(0.0,1.0) < prob:
+                    if len(b_sites) > 0:
+                        i = random.choice(b_sites)
+                        print "built site : ",i," currently: ",new_props[i][0]
+                        new_props[i][0] = 3
+                        if i in a_sites: a_sites.remove(i)
+                else:
+                    if (len(a_sites)) > 0 :
+                        i = random.choice(a_sites)
+                        print "extending access site : ",i," currently: ",new_props[i][0], "adding :"
+                        new_props[i][0] = 2
+                        if i in a_sites: a_sites.remove(i)
+                        if i in b_sites: b_sites.remove(i)
+                        n_temp = self.hist[g].link[i]
+                        for j in n_temp:
+                            if self.hist[g].val[j][0] == 0: 
+                                if not(j in b_sites) : b_sites.append(j)
+                                if not(j in a_sites) : a_sites.append(j)
+                        print
+                self.hist[g].val = new_props
+#            print self.hist[g].val
+#            raw_input("press enter...")
             g+=1
+
         self.hist[0].val = init_props
+
 
     def write_images(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
         size = self.hist[0].size
@@ -507,7 +576,7 @@ class History():
         print "writing to ",fname+".bat"
         fout = open(base_path + os.sep + fname+".bat",'w')
         fout.write('cd '+base_path + '\n')
-        fout.write('convert -delay 40 -loop 0 *.svg '+fname+'.gif\n')
+        fout.write('convert -delay 4 -loop 0 *.svg '+fname+'.gif\n')
         fout.write(fname+'.gif\n')
  #       fout.write('pause\n')
         fout.close()
