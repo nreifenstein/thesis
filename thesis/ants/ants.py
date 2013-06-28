@@ -4,7 +4,8 @@ from decodes.core import *
 from decodes.core import dc_color, dc_base, dc_vec, dc_point, dc_cs, dc_line, dc_mesh, dc_pgon, dc_xform
 #from decodes.io import *
 #from decodes.io import outie
-import copy, csv
+import copy
+import csv
 print "ants.py loaded"
 import os,cStringIO
 
@@ -66,15 +67,15 @@ class Graph():
         mod_y = block_size.b + 1
         c_x = (model_size.a + block_size.a) / 2
         c_y = (model_size.b + block_size.b) / 2
-        v = []
+        v = (model_size.a * model_size.b) * [0]
 
         for i in range(model_size.a):
             for j in range(model_size.b):
                 k = i+j*model_size.a
-                if ((i-c_y) % mod_y == 0) or ((j-c_x) % mod_x == 0):
-                    v.append([1])
+                if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
+                    v[k] = [1]
                 else:
-                    v.append([0])
+                    v[k] = [0]
 
         self.val = v
 
@@ -337,6 +338,7 @@ class Graph():
 
     def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)}):
         # quick and dirty svg writer
+        ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
 
         c = min(cdim.a/self.size.a,cdim.b/self.size.b)
@@ -354,7 +356,7 @@ class Graph():
             dx = c * self.cell[k][0]/2
             dy = c * self.cell[k][1]/2
             px = c * self.pts[k][0]
-            py = c * self.pts[k][1]
+            py = ht - c * self.pts[k][1]
             pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
             col = color_dict[self.val[k][0]]
             style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:0;stroke:none'
@@ -478,72 +480,8 @@ class History():
         for j in range(m*n): init_props.append([self.hist[0].val[j][0]])
         while g < gen:
             self.add_gen()
-#            execfile(self.rule_text)
+            execfile(self.rule_text)
 
-            # modified 06.23.2013 to create distinct first generation
-            # modified 06.26.2013 to create incremental additions
-            print ".",
-            prob = self.param[0] / 100.0
-#            for j in range(m*n): new_props.append([0,0])
-
-
-            if g == 1:
-                b_sites = []
-                a_sites = []
-                for i in range(m*n):
-                    if self.hist[g].val[i][0] == 0:         
-                        n_temp = self.hist[g].n_vals(i)
-         
-                        a_temp = a_count(1,0,n_temp)
-                        b_temp = a_count(2,0,n_temp)
-                        if a_temp > 0:
-                            if a_temp >1 : 
-                                self.hist[g].val[i][0] = 3
-                    
-                            elif b_temp == 0:
-                                if random.uniform(0.0,1.0) < prob: 
-                                    self.hist[g].val[i][0] = 3
-                                else: self.hist[g].val[i][0] = 2                
-                            else: self.hist[g].val[i][0] = 3
-                        else: self.hist[g].val[i][0] = 0
-                    else: t = 1
-                    if self.hist[g].val[i][0] == 3:
-                        if i == 687:
-                            raw_input("press enter...")
-                        if not(i in b_sites) : b_sites.append(i)
-                        if i in a_sites : a_sites.remove(i)
-                    if self.hist[g].val[i][0] == 2:
-                        n_temp = self.hist[g].link[i]
-                        for j in n_temp:
-                            if self.hist[g].val[j][0] == 0: 
-                                if not(j in b_sites) : b_sites.append(j)
-                                if not(j in a_sites) : a_sites.append(j)
-            if g > 1: 
-                if g > 43:
-                    print '.'
-                new_props = []
-                for j in range(m*n): new_props.append(copy.copy(self.hist[g].val[j]))
-                print "generation = ",g,"  /",
-                if random.uniform(0.0,1.0) < prob:
-                    if len(b_sites) > 0:
-                        i = random.choice(b_sites)
-                        print "built site : ",i," currently: ",new_props[i][0]
-                        new_props[i][0] = 3
-                        if i in a_sites: a_sites.remove(i)
-                else:
-                    if (len(a_sites)) > 0 :
-                        i = random.choice(a_sites)
-                        print "extending access site : ",i," currently: ",new_props[i][0], "adding :"
-                        new_props[i][0] = 2
-                        if i in a_sites: a_sites.remove(i)
-                        if i in b_sites: b_sites.remove(i)
-                        n_temp = self.hist[g].link[i]
-                        for j in n_temp:
-                            if self.hist[g].val[j][0] == 0: 
-                                if not(j in b_sites) : b_sites.append(j)
-                                if not(j in a_sites) : a_sites.append(j)
-                        print
-                self.hist[g].val = new_props
 #            print self.hist[g].val
 #            raw_input("press enter...")
             g+=1
@@ -576,7 +514,7 @@ class History():
         print "writing to ",fname+".bat"
         fout = open(base_path + os.sep + fname+".bat",'w')
         fout.write('cd '+base_path + '\n')
-        fout.write('convert -delay 4 -loop 0 *.svg '+fname+'.gif\n')
+        fout.write('convert -delay 40 -loop 0 *.svg '+fname+'.gif\n')
         fout.write(fname+'.gif\n')
  #       fout.write('pause\n')
         fout.close()
