@@ -53,7 +53,7 @@ class Graph():
         self.val = []
         self._res = len(pts)
 
-    def init_rvals(self,choices=[[0,1]]):
+    def init_rvals(self,choices=[[0,1],[-1],[0]]):
         v = []
         for i in range(self._res):
             vi = []

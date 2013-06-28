@@ -149,7 +149,7 @@ if init_fname == "":
     if block_size.a == 0:
         init_r = 30 * [0]
         init_r[0] = 1
-        r.init_rvals([init_r])
+        r.init_rvals([init_r,[-1],[0]])
     else:
         r.init_block(model_size,block_size, param[0])
     r.to_csv(f_name,path)
