@@ -37,6 +37,9 @@ w = False
 param = []
 for i in range(10): param.append(0)
 param[0] = 25                           # inital probability
+param[1] = 4                            # depth
+param[5] = 40                           # ms per slide
+param[6] = 10                           # step size
 param[7] = (40,40)                      # model size
 param[8] = 0                            # block size
 param[9] = (400,400)                    # display size

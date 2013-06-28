@@ -73,9 +73,9 @@ class Graph():
             for j in range(model_size.b):
                 k = i+j*model_size.a
                 if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
-                    v[k] = [1]
+                    v[k] = [1,0,0]
                 else:
-                    v[k] = [0]
+                    v[k] = [0,0,0]
 
         self.val = v
 
@@ -123,6 +123,10 @@ class Graph():
                     self.link[j].append(i)
                     
     def direction(self,i,j):
+        WEST = 0
+        NORTH = 1
+        EAST = 2
+        SOUTH = 3
         p1 = self.pts[i]
         p2 = self.pts[j]
         dx = p1[0]-p2[0]
@@ -459,6 +463,7 @@ class History():
         self.hist = [init_graph]
         self.rule_text = "default.txt"
         self.param = []
+        self.log = ['start']
 
     def set_color_dict(self,_color_dict):
         self.color_dict = _color_dict
@@ -476,14 +481,101 @@ class History():
         m = self.hist[0].size.a
         n = self.hist[0].size.b
         g = 1
-        init_props = []
-        for j in range(m*n): init_props.append([self.hist[0].val[j][0]])
+        init_props = copy.copy(self.hist[0].val)
+
         while g < gen:
             self.add_gen()
-            execfile(self.rule_text)
+#            execfile(self.rule_text)
 
-#            print self.hist[g].val
-#            raw_input("press enter...")
+            # modified 06.26.2013 to create incremental additions
+            print ".",
+            prob = self.param[0] / 100.0
+            #  for j in range(m*n): new_props.append([0,0])
+
+
+            if g == 1:
+                b_sites = []
+                a_sites = []
+                log_string = 'first generation'
+                for i in range(m*n):
+                    self.hist[g].val[i][1] = -1
+                    if self.hist[g].val[i][0] == 0:         
+                        n_temp = self.hist[g].n_vals(i)
+
+                        a_temp = a_count(1,0,n_temp)
+                        b_temp = a_count(2,0,n_temp)
+                        if a_temp > 0:
+                            if a_temp >1 : 
+                                self.hist[g].val[i][0] = 3
+
+                            elif b_temp == 0:
+                                if random.uniform(0.0,1.0) < prob: 
+                                    self.hist[g].val[i][0] = 3
+                                else: self.hist[g].val[i][0] = 2                
+                            else: self.hist[g].val[i][0] = 3
+                        else: self.hist[g].val[i][0] = 0
+                    else: t = 1
+                    if self.hist[g].val[i][0] == 3:
+                        if not(i in b_sites) : b_sites.append(i)
+                        if i in a_sites : a_sites.remove(i)
+                    if self.hist[g].val[i][0] == 2:
+                        d_temp = -1
+                        n_temp = self.hist[g].link[i]
+                        for j in n_temp:
+                            if self.hist[g].val[j][0] == 1:
+                                d_temp = self.hist[g].direction(i,j)
+                                self.hist[g].val[i][1] = d_temp
+                            if self.hist[g].val[j][0] == 0: 
+                                if not(j in b_sites) : b_sites.append(j)
+                                if not(j in a_sites) : a_sites.append(j)
+
+            else: 
+                new_props = []
+                for j in range(m*n): new_props.append(copy.copy(self.hist[g].val[j]))
+                b_list = []
+                d_list = []
+                e_list = []
+                dir_list = []
+                p_list = []
+                log_string = 'no action'
+                for i in range(m*n):
+                    if (self.hist[g-1].val[i][0] == 1) or (self.hist[g-1].val[i][0] == 2):
+                        for k in self.hist[g-1].link[i]:
+                            if self.hist[g-1].val[k][0] == 0:
+                                d  = self.hist[g-1].direction(i,k)
+                                p = self.hist[g-1].val[i][2]
+                                b_list.append(k)
+                                if (d%2) == (self.hist[g-1].val[i][1] % 2):
+                                    e_list.append(k)
+                                    dir_list.append(d)
+                                    p_list.append(p)
+                                else:
+                                    if p < self.param[1]:
+                                        d_list.append(k)
+                                        dir_list.append(d)
+                                        p_list.append(p+1)
+                if random.uniform(0.0,1.0) < prob:
+                    if len(b_list) > 0:
+                        new_cell = random.choice(b_list)
+                        new_props[new_cell][0] = 3
+                        log_string = 'building at '+str(new_cell)
+                elif len(e_list + d_list) > 0:
+                    new_cell = random.choice(e_list + d_list)
+                    if new_cell in e_list: 
+                        new_props[new_cell][1] = dir_list[e_list.index(new_cell)]
+                        new_props[new_cell][2] = p_list[e_list.index(new_cell)]
+                        log_string = 'access extension at '+str(new_cell) +' d= '+str(new_props[new_cell][2])
+                    else: 
+                        new_props[new_cell][1] = dir_list[d_list.index(new_cell)]
+                        new_props[new_cell][2] = p_list[d_list.index(new_cell)]
+                        log_string = 'access displacement at '+str(new_cell)+' d= '+str(new_props[new_cell][2])
+                    new_props[new_cell][0] = 2
+                    
+                self.hist[g].val = new_props
+
+    #            print self.hist[g].val
+    #            raw_input("press enter...")
+            self.log.append(log_string)
             g+=1
 
         self.hist[0].val = init_props
@@ -492,29 +584,31 @@ class History():
     def write_images(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
         size = self.hist[0].size
         for i,g in enumerate(self.hist):
-            img = g.to_image(size,self.color_dict)
-            img.save(fname+str(i), base_path, True)
+            if i % self.param(6) == 0:
+                img = g.to_image(size,self.color_dict)
+                img.save(fname+str(i), base_path, True)
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500),state_dict=dict()):
         for i,g in enumerate(self.hist):
-            g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict)
+            if i%self.param[6] == 0:
+                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict)
         if len(state_dict) != 0:
             print "writing to ",fname+"_m.csv"
             np = len(state_dict)
             fout = open(base_path + os.sep + fname+"_m.csv",'w')
-            out_string = ",".join(['generation']+state_dict.values())
+            out_string = ",".join(['generation']+state_dict.values()+['action'])
             fout.write(out_string+'\n')
             for i,g in enumerate(self.hist):
                 v = np * [0]
                 for j in g.val:
                     v[j[0]%np]+=1
-                out_string = ",".join([str(n) for n in [i]+v])
+                out_string = ",".join([str(n) for n in [i]+v] + [self.log[i]])
                 fout.write(out_string+'\n')
             fout.close()
         print "writing to ",fname+".bat"
         fout = open(base_path + os.sep + fname+".bat",'w')
         fout.write('cd '+base_path + '\n')
-        fout.write('convert -delay 40 -loop 0 *.svg '+fname+'.gif\n')
+        fout.write('convert -delay '+str(self.param[5])+' -loop 0 *.svg '+fname+'.gif\n')
         fout.write(fname+'.gif\n')
  #       fout.write('pause\n')
         fout.close()
