@@ -8,15 +8,18 @@ import copy
 import csv
 print "ants.py loaded"
 import os,cStringIO
+import PIL
 
 ## define graph class
 class Graph():
     def __init__(self,_list=[],_pts=[],_cells=[],_vals=[]):
-        self.link = _list
-        self.pts = _pts
-        self.cell = _cells
-        self.val = _vals
-        self._res = len(_vals)
+        self.link = copy.copy(_list)
+        self.pts = copy.copy(_pts)
+        self.cell = copy.copy(_cells)
+        self.val = copy.copy(_vals)
+
+    @property
+    def _res(self):  return len(self.val)
 
     def init_rectgrid(self,size=Interval(20,20),include_corners=False,wrap=False,cellsize=1):
         self.size = size
@@ -79,6 +82,37 @@ class Graph():
 
         self.val = v
 
+    def init_ppm(self, init_fname = "in", path=os.path.expanduser("~") + os.sep,color_dict = {0:Color(0.0),1:Color(1.0)}):
+        fin = open(path+init_fname+'.ppm')
+        lines = []
+        for line in fin:
+            lines.append(line)
+        fin.close()
+        print len(lines)
+        a = 1
+
+        model_dimensions = lines[2]
+        dims = model_dimensions.strip().split(' ')
+        m = int(dims[0])
+        n = int(dims[1])
+        self.init_rectgrid(Interval(m,n),include_corners=False,wrap=False,cellsize=1)
+        counter = 4
+        vals = []
+        for k in list(range(m*n)): vals.append([0,-1,0])
+        for i in range(m):
+            for j in range(n):
+                col = []
+                for c in range(counter, counter+3):
+                    col.append(int(lines[c]))
+
+                v = 0
+                for k in color_dict:
+                    if (color_dict[k].r*255 == col[0]) and (color_dict[k].g*255 == col[1]) and (color_dict[k].b*255 == col[2]):
+                        v = k
+#                print "color = ", col, " = ", v
+                vals[j+(m-i-1)*m] = [v,-1,0]
+                counter +=3
+        self.val = vals
 
 
     def to_file(self,fname=os.path.expanduser("~") + os.sep + 'out.txt'):
@@ -139,7 +173,7 @@ class Graph():
             return SOUTH
             
             
-    def neighbor(self, i,j):
+    def neighbor(self, i,j, neighborhood_type = 1, epsilon = .01):
         if i == j : return False                   
         p1 = self.pts[i]
         p2 = self.pts[j]
@@ -152,17 +186,21 @@ class Graph():
         lx = c1[0]/2 + c2[0]/2     ## get sum of widths, height, lengths
         ly = c1[1]/2 + c2[1]/2 
         lz = 0
-        if NEIGHBORHOOD_TYPE == MOORE:
-           return (dx <= lx + EPSILON) and (dy <= ly + EPSILON) and (dz <= lz+ EPSILON)
-        elif NEIGHBORHOOD_TYPE == VON_NEUMANN:
-            if abs(dx - lx) < EPSILON:
-                return dy < ly - EPSILON
-            if abs(dy - ly) < EPSILON:
-                return dx < lx - EPSILON
+        if neighborhood_type == 0:  # MOORE
+           return (dx <= lx + epsilon) and (dy <= ly + epsilon) and (dz <= lz+ epsilon)
+        elif neighborhood_type == 1: # VON NEUMANN
+            if abs(dx - lx) < epsilon:
+                return dy < ly - epsilon
+            if abs(dy - ly) < epsilon:
+                return dx < lx - epsilon
             return False
         else: return False
             
     def divide(self,i,d,q):     ## i = cell index, d = direction, q = fraction
+        v = [[-1,0,0],[0,1,0],[1,0,0],[0,-1,0]]                                 # contains vector displacements for cardinal directions WNES
+        scales = [[.5,1],[1,.5],[.5,1],[1,.5]]
+        deltas = [[.5,0],[0,-.5],[-.5,0],[0,.5]]
+
         s1 = [[1-q,1,1],[1,1-q,1],[1-q,1,1],[1,1-q,1]]                  # contains scale factors for new cell
         s2 = [[q,1,1],[1,q,1],[q,1,1],[1,q,1]]          # contains scale factors for remainder
 
@@ -172,7 +210,7 @@ class Graph():
         b1 = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(c2,v[(d+2)%4])))            # creates new base points
         b2 = a_add_like(self.pts[i],a_scalar(.5,a_mult_like(c1,v[d])))
 
-        new_i = self.addcell([i],b2,c2,self.val[i])                                                      # make new cells
+        new_i = self.addcell([i],b2,c2,copy.copy(self.val[i]))                          # make new cells
         
         n = self.link[i]                   # get neighbors
         self.link[i] = [new_i]
@@ -184,7 +222,7 @@ class Graph():
                 if self.neighbor(j,k):
                     self.link[j].append(k)
                     self.link[k].append(j)
-        return True
+        return new_i
         
         
     def combine(self,i,j):
@@ -193,7 +231,7 @@ class Graph():
         test = False
         for k in [0,1]:                                 # check if they are same h/w
             #print self.pts[i][k],self.pts[j][k]
-            if (abs(self.pts[i][k]-self.pts[j][k]) < EPSILON) and (self.cell[i][k] == self.cell[j][k]): test = True
+            if (abs(self.pts[i][k]-self.pts[j][k]) < epsilon) and (self.cell[i][k] == self.cell[j][k]): test = True
         if not(test) : return False                     # not same h/w
         print i,j," can be combined"
         n_new = a_rem_dup(self.link[i]+self.link[j])
@@ -217,10 +255,13 @@ class Graph():
             if self.val[i] == val : result.append(i)
         return result
         
-    def n_vals(self,c):                         # create list of the values of the neighbors of c
+    def n_vals(self,c,k=0):                         # create list of the values of the neighbors of c
         result = []
         for i in self.link[c]:
-            result.append(self.val[i])
+            if k == -1:
+                result.append(self.val[i])
+            else:
+                result.append(self.val[i][k])
         return result
         
     def have_neighbor(self,mp,np):              # create list of cells with (1) vals in mp and (2) neighbors with np
@@ -316,7 +357,9 @@ class Graph():
                     pts.append([float(row[1]),float(row[2]),float(row[3])])
 
                     v = []
-                    for i in range(4,u): v.append(int(row[i]))
+                    for i in range(4,u): 
+                        if row[i] == "" : row[i] = "0"
+                        v.append(int(row[i]))
                     val.append(v)
                     c = []
                     for i in range(u,u+3): c.append(float(row[i]))
@@ -356,7 +399,7 @@ class Graph():
 
         type = 'polygon'
 
-        for k in range(self._res):
+        for k in range(len(self.val)):
             dx = c * self.cell[k][0]/2
             dy = c * self.cell[k][1]/2
             px = c * self.pts[k][0]
@@ -406,12 +449,12 @@ def touch(p1,c1,p2,c2):
     lz = 0
     #print "in touch. lx,ly,lz: ", lx,ly,lz
     if NEIGHBORHOOD_TYPE == MOORE:
-        return (dx <= lx + EPSILON) and (dy <= ly + EPSILON) and (dz <= lz+ EPSILON)
+        return (dx <= lx + epsilon) and (dy <= ly + epsilon) and (dz <= lz+ epsilon)
     elif NEIGHBORHOOD_TYPE == VON_NEUMANN:
-        if abs(dx - lx) < EPSILON:
-            return dy < ly - EPSILON
-        if abs(dy - ly) < EPSILON:
-            return dx < lx - EPSILON
+        if abs(dx - lx) < epsilon:
+            return dy < ly - epsilon
+        if abs(dy - ly) < epsilon:
+            return dx < lx - epsilon
         return False
     else: return False
 
@@ -482,103 +525,86 @@ class History():
         n = self.hist[0].size.b
         g = 1
         init_props = copy.copy(self.hist[0].val)
+        prob = self.param[0]/100.0
 
         while g < gen:
-            self.add_gen()
 #            execfile(self.rule_text)
-
             # modified 06.26.2013 to create incremental additions
+            # updated 07.02.2013
+            # new architecture 07.03.2013
+
+            # add new generation
+            self.add_gen()
+            log_string = 'testing'
             print ".",
-            prob = self.param[0] / 100.0
-            #  for j in range(m*n): new_props.append([0,0])
+            # create list of enablers [access sites]
+            a_list = []
+            for j in range(len(self.hist[g-1].val)):
+                if (self.hist[g-1].val[j][0] == 1 or self.hist[g-1].val[j][0] == 2) and (0 in self.hist[g-1].n_vals(j)):
+                    a_list.append(j)
+
+            if len(a_list) == 0 : 
+                self.log.append('no more building sites')
+                break
+
+            # create iterator list - i_list
+            if self.param[3] == 0 :
+                i_list = a_list
+            else:
+                i_list = [random.choice(a_list)]
 
 
-            if g == 1:
-                b_sites = []
-                a_sites = []
-                log_string = 'first generation'
-                for i in range(m*n):
-                    self.hist[g].val[i][1] = -1
-                    if self.hist[g].val[i][0] == 0:         
-                        n_temp = self.hist[g].n_vals(i)
+            # loop through i_list
+            for i in i_list:
 
-                        a_temp = a_count(1,0,n_temp)
-                        b_temp = a_count(2,0,n_temp)
-                        if a_temp > 0:
-                            if a_temp >1 : 
-                                self.hist[g].val[i][0] = 3
+                # make list of neighbors with val == 0
+                n_list = []
+                for n in self.hist[g-1].link[i]:
+                    if (self.hist[g-1].val[n][0] == 0):
+                        n_list.append(n)
 
-                            elif b_temp == 0:
-                                if random.uniform(0.0,1.0) < prob: 
-                                    self.hist[g].val[i][0] = 3
-                                else: self.hist[g].val[i][0] = 2                
-                            else: self.hist[g].val[i][0] = 3
-                        else: self.hist[g].val[i][0] = 0
-                    else: t = 1
-                    if self.hist[g].val[i][0] == 3:
-                        if not(i in b_sites) : b_sites.append(i)
-                        if i in a_sites : a_sites.remove(i)
-                    if self.hist[g].val[i][0] == 2:
-                        d_temp = -1
-                        n_temp = self.hist[g].link[i]
-                        for j in n_temp:
-                            if self.hist[g].val[j][0] == 1:
-                                d_temp = self.hist[g].direction(i,j)
-                                self.hist[g].val[i][1] = d_temp
-                            if self.hist[g].val[j][0] == 0: 
-                                if not(j in b_sites) : b_sites.append(j)
-                                if not(j in a_sites) : a_sites.append(j)
+                # create iterator list for neighbors
+                if self.param[3] == 0 :
+                    j_list = n_list
+                else:
+                    j_list = [random.choice(n_list)]
 
-            else: 
-                new_props = []
-                for j in range(m*n): new_props.append(copy.copy(self.hist[g].val[j]))
-                b_list = []
-                d_list = []
-                e_list = []
-                dir_list = []
-                p_list = []
-                log_string = 'no action'
-                for i in range(m*n):
-                    if (self.hist[g-1].val[i][0] == 1) or (self.hist[g-1].val[i][0] == 2):
-                        for k in self.hist[g-1].link[i]:
-                            if self.hist[g-1].val[k][0] == 0:
-                                d  = self.hist[g-1].direction(i,k)
-                                p = self.hist[g-1].val[i][2]
-                                b_list.append(k)
-                                if (d%2) == (self.hist[g-1].val[i][1] % 2):
-                                    e_list.append(k)
-                                    dir_list.append(d)
-                                    p_list.append(p)
-                                else:
-                                    if p < self.param[1]:
-                                        d_list.append(k)
-                                        dir_list.append(d)
-                                        p_list.append(p+1)
-                if random.uniform(0.0,1.0) < prob:
-                    if len(b_list) > 0:
-                        new_cell = random.choice(b_list)
-                        new_props[new_cell][0] = 3
-                        log_string = 'building at '+str(new_cell)
-                elif len(e_list + d_list) > 0:
-                    new_cell = random.choice(e_list + d_list)
-                    if new_cell in e_list: 
-                        new_props[new_cell][1] = dir_list[e_list.index(new_cell)]
-                        new_props[new_cell][2] = p_list[e_list.index(new_cell)]
-                        log_string = 'access extension at '+str(new_cell) +' d= '+str(new_props[new_cell][2])
-                    else: 
-                        new_props[new_cell][1] = dir_list[d_list.index(new_cell)]
-                        new_props[new_cell][2] = p_list[d_list.index(new_cell)]
-                        log_string = 'access displacement at '+str(new_cell)+' d= '+str(new_props[new_cell][2])
-                    new_props[new_cell][0] = 2
-                    
-                self.hist[g].val = new_props
+                # loop through j_list
+                for j in j_list:
 
-    #            print self.hist[g].val
-    #            raw_input("press enter...")
-            self.log.append(log_string)
+                    # check for special cases
+                    flag = False
+                    neighbor_values = self.hist[g].n_vals(j,k=-1)
+                    street_count = a_count(1,0,neighbor_values)
+                    access_count = a_count(2,0,neighbor_values)
+
+                    #       case 1: site is at intersection [built corner rule]
+                    if street_count > 1 : flag = True
+
+                    #       case 2: site is on the street but already has access adjacent [alternation rule]
+                    #               Note: this uses the current generation (g not g-1 see above) to test emergent order in this generation
+                    if (street_count == 1) and (access_count > 0) : flag = True
+
+                    # main loop
+                    if flag or (self.hist[g-1].val[i][2] > self.param[1]) or (random.uniform(0.0,1.0) < prob):
+                        # greedy [built] only
+                        self.hist[g].val[j] = [3,-1,0]
+                    else:
+                        # charleston [access]
+                        t = []
+                        t.append(2)
+                        d = self.hist[g].direction(j,i)
+                        t.append(d)
+                        if d%2 == self.hist[g].val[i][1] :
+                            t.append(self.hist[g].val[i][2] + (1.0/self.param[4]))
+                        else:
+                            t.append(self.hist[g].val[i][2] + 1.0 )
+                        self.hist[g].val[j] = t
+            self.log.append(log_string)        
             g+=1
-
-        self.hist[0].val = init_props
+        print
+            
+#        self.hist[0].val = init_props
 
 
     def write_images(self, fname="out", base_path=os.path.expanduser("~") + os.sep):
@@ -651,5 +677,6 @@ class History():
         print self.hist[n]
 
     def add_gen(self):
-        self.hist.append(copy.copy(self.hist[-1]))
+        self.hist.append(Graph(self.hist[-1].link,self.hist[-1].pts, self.hist[-1].cell, self.hist[-1].val ))
+        self.hist[-1].size = self.hist[-2].size
 

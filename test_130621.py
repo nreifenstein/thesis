@@ -6,17 +6,15 @@ from thesis.ants.ants import Graph, History
 from decodes.extensions.cellular_automata import CA
 import random
 import datetime
-import cPickle
 
-"""
+#import PIL
+#from PIL import *
+#print PIL
 
-prop_values = (0,1,2,3)
-prop_colors = (Color(1,1,1),Color(248.0/255.0,219/255.0,148/255.0),Color(243/255.0,172/255.0,113/255.0),Color(237/255.0,28/255.0,36/255.0))
-state_list = ('undeveloped','streets','access','built')
-no_states = len(state_list)
-color_dict = dict(zip(prop_values,prop_colors))
-state_dict = dict(zip(prop_values, state_list))
-"""
+
+
+
+#from PIL import Image as PILImage
 
 names =('undeveloped')
 colors = ((0,0,0))
@@ -38,6 +36,8 @@ param = []
 for i in range(10): param.append(0)
 param[0] = 25                           # inital probability
 param[1] = 4                            # depth
+param[2] = 1                            # 0 = no first gen; 1 = first gen
+param[3] = 1                            # 0 = full (synchronous); 1 = select one (asynchronous)
 param[5] = 40                           # ms per slide
 param[6] = 10                           # step size
 param[7] = (40,40)                      # model size
@@ -53,6 +53,10 @@ base_path = "F:\\2013 Summer\\Thesis\\_ants"+"\\"
 init_fname = ""
 out_fname = ""
 rule_fname = "default.txt"
+
+#im = PILImage.open(base_path+'test.jpg')
+
+#print im.getpixel((0,0))
 
 lines = []
 fin = open(base_path+'setup.txt')
@@ -144,6 +148,10 @@ fout.close()
 ### Main Function
 
 r = Graph()
+#r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
+# r.init_ppm("untitled3",base_path,color_dict)
+
+
 if init_fname == "":
     r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
     if block_size.a == 0:
@@ -154,26 +162,14 @@ if init_fname == "":
         r.init_block(model_size,block_size, param[0])
     r.to_csv(f_name,path)
 else:
-    r.from_csv(init_fname,base_path)
+    r.init_ppm(init_fname,base_path,color_dict)
+#    r.from_csv(init_fname,base_path)
 
 if out_fname != "":
     r.to_csv(out_fname,base_path)
 
-#init_r = [0,1,2]
-#r.init_rvals([init_r])
-#r.to_csv(f_name,path)
-#r.to_svg("svg_out11",color_dict,cdim=Interval(1000,1000))
-
-#r.from_csv("test",path)
 
 t= History(r)
-
-#execfile(base_path+rule_fname)
-#fin = open(base_path+rule_fname)
-#test_string = fin.readlines()
-#fin.close()
-
-#exec(test_string)
 
 t.set_rule(base_path+rule_fname)
 t.set_params(param)
