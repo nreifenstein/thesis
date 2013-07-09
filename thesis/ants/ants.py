@@ -183,8 +183,8 @@ class Graph():
         dx = abs(p1[0] - p2[0])             ## get absolute value of distances between basepoints
         dy = abs(p1[1] - p2[1])
         dz = abs(p1[2] - p2[2])
-        lx = c1[0]/2 + c2[0]/2     ## get sum of widths, height, lengths
-        ly = c1[1]/2 + c2[1]/2 
+        lx = c1[0]/2.0 + c2[0]/2.0     ## get sum of widths, height, lengths
+        ly = c1[1]/2.0 + c2[1]/2.0 
         lz = 0
         if neighborhood_type == 0:  # MOORE
            return (dx <= lx + epsilon) and (dy <= ly + epsilon) and (dz <= lz+ epsilon)
@@ -383,7 +383,7 @@ class Graph():
         self._res = len(val)
 
 
-    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)}):
+    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},v_rule = 'col=color_dict[val[0]]'):
         # quick and dirty svg writer
         ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
@@ -405,7 +405,12 @@ class Graph():
             px = c * self.pts[k][0]
             py = ht - c * self.pts[k][1]
             pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
-            col = color_dict[self.val[k][0]]
+            val = self.val[k]
+
+#            exec(v_rule)
+            col = color_dict[val[0]][int(val[2])]
+
+#            col = color_dict[self.val[k][0]]
             style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:0;stroke:none'
             point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
             atts = 'points="'+point_string+'"'
@@ -514,6 +519,12 @@ class History():
     def set_rule(self,_string="default.txt"):
         self.rule_text = _string
 
+    def set_vis(self,_string="color_default.txt"):
+        fin = open(_string)
+        self.vis_text = fin.read()
+        fin.close()
+        print "read"
+
     def set_params(self,_param):
         self.param = _param
 
@@ -527,83 +538,11 @@ class History():
         init_props = copy.copy(self.hist[0].val)
         prob = self.param[0]/100.0
 
-        while g < gen:
-#            execfile(self.rule_text)
-            # modified 06.26.2013 to create incremental additions
-            # updated 07.02.2013
-            # new architecture 07.03.2013
-
-            # add new generation
-            self.add_gen()
-            log_string = 'testing'
-            print ".",
-            # create list of enablers [access sites]
-            a_list = []
-            for j in range(len(self.hist[g-1].val)):
-                if (self.hist[g-1].val[j][0] == 1 or self.hist[g-1].val[j][0] == 2) and (0 in self.hist[g-1].n_vals(j)):
-                    a_list.append(j)
-
-            if len(a_list) == 0 : 
-                self.log.append('no more building sites')
-                break
-
-            # create iterator list - i_list
-            if self.param[3] == 0 :
-                i_list = a_list
-            else:
-                i_list = [random.choice(a_list)]
-
-
-            # loop through i_list
-            for i in i_list:
-
-                # make list of neighbors with val == 0
-                n_list = []
-                for n in self.hist[g-1].link[i]:
-                    if (self.hist[g-1].val[n][0] == 0):
-                        n_list.append(n)
-
-                # create iterator list for neighbors
-                if self.param[3] == 0 :
-                    j_list = n_list
-                else:
-                    j_list = [random.choice(n_list)]
-
-                # loop through j_list
-                for j in j_list:
-
-                    # check for special cases
-                    flag = False
-                    neighbor_values = self.hist[g].n_vals(j,k=-1)
-                    street_count = a_count(1,0,neighbor_values)
-                    access_count = a_count(2,0,neighbor_values)
-
-                    #       case 1: site is at intersection [built corner rule]
-                    if street_count > 1 : flag = True
-
-                    #       case 2: site is on the street but already has access adjacent [alternation rule]
-                    #               Note: this uses the current generation (g not g-1 see above) to test emergent order in this generation
-                    if (street_count == 1) and (access_count > 0) : flag = True
-
-                    # main loop
-                    if flag or (self.hist[g-1].val[i][2] > self.param[1]) or (random.uniform(0.0,1.0) < prob):
-                        # greedy [built] only
-                        self.hist[g].val[j] = [3,-1,0]
-                    else:
-                        # charleston [access]
-                        t = []
-                        t.append(2)
-                        d = self.hist[g].direction(j,i)
-                        t.append(d)
-                        if d%2 == self.hist[g].val[i][1] :
-                            t.append(self.hist[g].val[i][2] + (1.0/self.param[4]))
-                        else:
-                            t.append(self.hist[g].val[i][2] + 1.0 )
-                        self.hist[g].val[j] = t
-            self.log.append(log_string)        
-            g+=1
-        print
-            
+#        while g < gen:
+        execfile(self.rule_text)
+#            g += 1
+        if self.param[2] == 1:
+            self.hist[0] = self.hist[1]   
 #        self.hist[0].val = init_props
 
 
@@ -616,8 +555,8 @@ class History():
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500),state_dict=dict()):
         for i,g in enumerate(self.hist):
-            if i%self.param[6] == 0:
-                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict)
+            if (i%self.param[6] == 0) or (i+ 1== len(self.hist)):
+                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.vis_text)
         if len(state_dict) != 0:
             print "writing to ",fname+"_m.csv"
             np = len(state_dict)

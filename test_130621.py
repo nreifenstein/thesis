@@ -53,6 +53,7 @@ base_path = "F:\\2013 Summer\\Thesis\\_ants"+"\\"
 init_fname = ""
 out_fname = ""
 rule_fname = "default.txt"
+vis_fname = "color_default.txt"
 
 #im = PILImage.open(base_path+'test.jpg')
 
@@ -108,6 +109,9 @@ for line in fin:
     if switch == "r":
         rule_fname = arg.strip()
         print "rules loaded from ", rule_fname
+    if switch == "v":
+        vis_fname = arg.strip()
+        print "color visualization from ", vis_fname
 fin.close()
 
 # convert param list to working params
@@ -123,7 +127,17 @@ no_states = min(len(names),len(colors))
 prop_values = range(no_states)
 prop_colors = []
 for c in colors:
-    prop_colors.append(Color(c[0]/255.0,c[1]/255.0,c[2]/255.0))
+    if type(c[1]) == tuple:
+        # set up list
+        the_color_list = []
+        c_low = Color(c[1][0]/255.0,c[1][1]/255.0,c[1][2]/255.0)
+        c_high = Color(c[2][0]/255.0,c[2][1]/255.0,c[2][2]/255.0)
+        for k in range(c[0]):
+            the_color_list.append(Color().interpolate(c_low,c_high, k / (c[0]-1.0)))
+        print
+    else:
+        the_color_list = [Color(c[0]/255.0,c[1]/255.0,c[2]/255.0)]
+    prop_colors.append(the_color_list)
 
 color_dict = dict(zip(prop_values,prop_colors))
 state_dict = dict(zip(prop_values,names))
@@ -148,9 +162,6 @@ fout.close()
 ### Main Function
 
 r = Graph()
-#r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
-# r.init_ppm("untitled3",base_path,color_dict)
-
 
 if init_fname == "":
     r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
@@ -162,7 +173,7 @@ if init_fname == "":
         r.init_block(model_size,block_size, param[0])
     r.to_csv(f_name,path)
 else:
-    r.init_ppm(init_fname,base_path,color_dict)
+    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
 #    r.from_csv(init_fname,base_path)
 
 if out_fname != "":
@@ -171,7 +182,8 @@ if out_fname != "":
 
 t= History(r)
 
-t.set_rule(base_path+rule_fname)
+t.set_rule(base_path+'\\rules\\'+rule_fname)
+t.set_vis(base_path+'\\rules\\'+vis_fname)
 t.set_params(param)
 
 t.generate(no_gen)
