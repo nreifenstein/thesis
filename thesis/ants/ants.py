@@ -411,7 +411,13 @@ class Graph():
             col = color_dict[val[0]][int(val[2])]
 
 #            col = color_dict[self.val[k][0]]
-            style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:0;stroke:none'
+            if val[0] == 3:
+                sw = str(c/10)
+                st = 'rgb(255,255,255)'
+            else:
+                sw = '0'
+                st = 'none'
+            style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:'+sw+';stroke:'+st
             point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
             atts = 'points="'+point_string+'"'
             buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
@@ -565,8 +571,9 @@ class History():
             fout.write(out_string+'\n')
             for i,g in enumerate(self.hist):
                 v = np * [0]
-                for j in g.val:
-                    v[j[0]%np]+=1
+                for j in range(len(g.val)):
+
+                    v[g.val[j][0]%np]+=g.cell[j][0] * g.cell[j][1]
                 out_string = ",".join([str(n) for n in [i]+v] + [self.log[i]])
                 fout.write(out_string+'\n')
             fout.close()
