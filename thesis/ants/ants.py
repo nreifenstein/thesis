@@ -13,10 +13,22 @@ import PIL
 ## define graph class
 class Graph():
     def __init__(self,_list=[],_pts=[],_cells=[],_vals=[]):
-        self.link = copy.copy(_list)
+        new_links = []
+        for i in _list:
+            new_link = []
+            for j in i:
+                new_link.append(j)
+            new_links.append(new_link)
+        self.link = new_links
         self.pts = copy.copy(_pts)
         self.cell = copy.copy(_cells)
-        self.val = copy.copy(_vals)
+        new_vals = []
+        for i in _vals:
+            new_val = []
+            for j in i:
+                new_val.append(j)
+            new_vals.append(new_val)
+        self.val = new_vals
 
     @property
     def _res(self):  return len(self.val)
@@ -412,7 +424,7 @@ class Graph():
 
 #            col = color_dict[self.val[k][0]]
             if val[0] == 3:
-                sw = str(c/10)
+                sw = str(1)
                 st = 'rgb(255,255,255)'
             else:
                 sw = '0'
@@ -561,8 +573,10 @@ class History():
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500),state_dict=dict()):
         for i,g in enumerate(self.hist):
-            if (i%self.param[6] == 0) or (i+ 1== len(self.hist)):
+            if (i%self.param[6] == 0) or (i+1== len(self.hist)):
                 g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.vis_text)
+        for k in range(6):
+            g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.vis_text)
         if len(state_dict) != 0:
             print "writing to ",fname+"_m.csv"
             np = len(state_dict)
@@ -572,8 +586,7 @@ class History():
             for i,g in enumerate(self.hist):
                 v = np * [0]
                 for j in range(len(g.val)):
-
-                    v[g.val[j][0]%np]+=g.cell[j][0] * g.cell[j][1]
+                    v[g.val[j][0]%np]+=(g.cell[j][0] * g.cell[j][1]) * int(g.val[j][2]+1)
                 out_string = ",".join([str(n) for n in [i]+v] + [self.log[i]])
                 fout.write(out_string+'\n')
             fout.close()
@@ -623,6 +636,7 @@ class History():
         print self.hist[n]
 
     def add_gen(self):
-        self.hist.append(Graph(self.hist[-1].link,self.hist[-1].pts, self.hist[-1].cell, self.hist[-1].val ))
+        self.hist.append(Graph(copy.copy(self.hist[-1].link),copy.copy(self.hist[-1].pts), copy.copy(self.hist[-1].cell), copy.copy(self.hist[-1].val )))
         self.hist[-1].size = self.hist[-2].size
+
 

@@ -24,6 +24,8 @@ def fun(self,n):
     print "works!"
 
 
+
+
 sc = 1
 #p = [1]
 m = 10
@@ -31,7 +33,7 @@ n = 10
 w = False
 # p = .5 = sobe_2. p = .75 = sobe_3, p = .25 = sobe_4
 param = []
-for i in range(100): param.append(0)
+for i in range(10): param.append(0)
 param[0] = 25                           # inital probability
 param[1] = 4                            # depth
 param[2] = 1                            # 0 = no first gen; 1 = first gen
@@ -92,6 +94,7 @@ for line in fin:
         print "No of generations = ",arg
     if switch != "" and switch[0] == 'p':
         t = eval(switch[1:])
+        t = t % 10
         param[t] = eval(arg)
         print "Param "+str(t)+" =",param[t],arg
     if switch == 's':
