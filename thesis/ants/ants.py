@@ -575,7 +575,7 @@ class History():
         for i,g in enumerate(self.hist):
             if (i%self.param[6] == 0) or (i+1== len(self.hist)):
                 g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.vis_text)
-        for k in range(6):
+        for k in range(100//self.param[5]):
             g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.vis_text)
         if len(state_dict) != 0:
             print "writing to ",fname+"_m.csv"
