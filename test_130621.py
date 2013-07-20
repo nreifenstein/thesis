@@ -7,23 +7,6 @@ from decodes.extensions.cellular_automata import CA
 import random
 import datetime
 
-#import PIL
-#from PIL import *
-#print PIL
-
-
-
-
-#from PIL import Image as PILImage
-
-names =('undeveloped')
-colors = ((0,0,0))
-
-def fun(self,n):
-    print self.hist[n]
-    print "works!"
-
-
 sc = 1
 #p = [1]
 m = 10
@@ -41,6 +24,11 @@ param[6] = 10                           # step size
 param[7] = (40,40)                      # model size
 param[8] = 0                            # block size
 param[9] = (400,400)                    # display size
+param[10] = 3                           # number of values in val_list
+                                        # [0] = type of cell
+                                        # [1] = direction from last cell
+                                        # [2] = depth (or height)
+                                        # [3] = parcel #
 no_gen = 10
 
 
@@ -167,7 +155,7 @@ if init_fname == "":
         init_r[0] = 1
         r.init_rvals([init_r,[-1],[0]])
     else:
-        r.init_block(model_size,block_size, param[0])
+        r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10])
     r.to_csv(f_name,path)
 else:
     r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
@@ -178,6 +166,7 @@ if out_fname != "":
 
 
 t= History(r)
+t.set_dict(color_dict,state_dict)
 
 t.set_rule(base_path+'\\rules\\'+rule_fname)
 t.set_vis(base_path+'\\rules\\'+vis_fname)
@@ -185,8 +174,9 @@ t.set_params(param)
 
 t.generate(no_gen)
 
-t.set_color_dict(prop_colors)
-t.write_svgs(f_name,path, display_size,state_dict)
+
+t.write_svgs(f_name,path, display_size)
+t.hist[-1].neighbors(13,len(state_dict))
 
 
 def a_count(v,i,a):

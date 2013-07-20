@@ -8,7 +8,13 @@ import copy
 import csv
 print "ants.py loaded"
 import os,cStringIO
-import PIL
+
+
+def is_same(line1, line2):
+    if line1[0] == line2[0] and line1[1] == line2[1]: return True
+    if line1[0] == line2[1] and line1[1] == line2[0]: return True
+    return False
+
 
 ## define graph class
 class Graph():
@@ -77,7 +83,7 @@ class Graph():
             v.append(vi)
         self.val = v
 
-    def init_block(self, model_size=Interval(40,40), block_size=Interval(20,20), init_val = 1, prob = 50):
+    def init_block(self, model_size=Interval(40,40), block_size=Interval(20,20), init_val = 1, no_vals = 1):
         mod_x = block_size.a + 1
         mod_y = block_size.b + 1
         c_x = (model_size.a + block_size.a) / 2
@@ -87,10 +93,14 @@ class Graph():
         for i in range(model_size.a):
             for j in range(model_size.b):
                 k = i+j*model_size.a
+                v[k] = no_vals * [0]
                 if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
-                    v[k] = [1,0,0]
+                    v[k][0] = 1
                 else:
-                    v[k] = [0,0,0]
+                    # simple parcelization
+                    t = j
+                    if i < model_size.a/2 : t = t * 100
+                    v[k][3] = t
 
         self.val = v
 
@@ -275,6 +285,15 @@ class Graph():
             else:
                 result.append(self.val[i][k])
         return result
+
+    def neighbors(self, i, no_states = 2):      # create a list that stores index/direction pairs for each possible state
+        result = no_states * [[]]
+        for k in self.link[i]:
+            d = self.direction(k,i)
+            if result[self.val[k][0]] == [] : result[self.val[k][0]] = [(k,d)]
+            else: result[self.val[k][0]].append((k,d))
+            a = 1
+        return result
         
     def have_neighbor(self,mp,np):              # create list of cells with (1) vals in mp and (2) neighbors with np
         result = []
@@ -290,37 +309,22 @@ class Graph():
             img._pixels[n] = color_dict[val[0]]
         return img
 
-    def to_dc_svg(self,f_name="svg_out", color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
+    def to_dc_svg(self,f_name="svg_out", path = os.path.expanduser("~"), color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
         # this uses Decodes. OK for nodes and link, slow for cells.
-        svg_out = dc.makeOut(dc.Outies.SVG, f_name, canvas_dimensions=cdim, flip_y = False)
+        svg_out = dc.makeOut(dc.Outies.SVG, f_name, path, canvas_dimensions=cdim, flip_y = False)
         lines = []
         pts = []
         pts2 = []   # total list, includes empty nodes - use for line list
         recs = []
         coord = self.pts
-        
-        for i in range(len(coord)): 
-#            print "checking node ",i
-            p = Point(coord[i][0],coord[i][1],coord[i][2])
-            pts2.append(p)
-            if len(self.link[i]) > 0:
-                if draw_nodes:
-                    p.set_color(Color(0.0))
-                    p.set_weight(self.cell[i][0]*.1)
-                pts.append(p)
-                if draw_recs:
-                    r = PGon.rectangle(p, self.cell[i][0], self.cell[i][1])
-                    r.set_color(color_dict[self.val[i][0]])
-                    recs.append(r)
 
-        if draw_link :
-            for i in list(range(len(coord))):
-                n = self.link[i]
-                for j in n:
-                    if i < j:
-                        line = Segment(pts2[i],pts2[j])
-                        line.set_color(Color(0.0))
-                        lines.append(line)
+        for i in range(len(self.pts)):
+            p = self.pts[i]
+            r = PGon.rectangle(p, self.cell[i][0], self.cell[i][1])
+            val = self.val[i]
+            r.set_color(color_dict[val[0]][int(val[2])])
+            recs.append(r)
+
 
         print "putting rectangles, ",
         if draw_recs : svg_out.put(recs)
@@ -395,7 +399,7 @@ class Graph():
         self._res = len(val)
 
 
-    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},v_rule = 'col=color_dict[val[0]]'):
+    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}):
         # quick and dirty svg writer
         ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
@@ -411,6 +415,12 @@ class Graph():
 
         type = 'polygon'
 
+        e_list = []
+        layer_list = len(state_dict) * [-1]
+
+        parcels = True
+        cells = True
+
         for k in range(len(self.val)):
             dx = c * self.cell[k][0]/2
             dy = c * self.cell[k][1]/2
@@ -419,21 +429,67 @@ class Graph():
             pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
             val = self.val[k]
 
-#            exec(v_rule)
-            col = color_dict[val[0]][int(val[2])]
+            # check neighborhood
+            if parcels :
+                for n in self.link[k]:
+                    # if this edge is a border
+                    if self.val[n][3] != self.val[k][3]:
+                        d = self.direction(n,k)
+                        if d == 0:
+                            p1 = [self.pts[n][0]+self.cell[n][0]/2.0, min(self.pts[n][1]+self.cell[n][1]/2.0,self.pts[k][1]+self.cell[k][1]/2.0)]
+                            p2 = [self.pts[n][0]+self.cell[n][0]/2.0, max(self.pts[n][1]-self.cell[n][1]/2.0,self.pts[k][1]-self.cell[k][1]/2.0)]
+                        if d == 1:
+                            p1 = [max(self.pts[n][0]-self.cell[n][0]/2.0,self.pts[k][0]-self.cell[k][0]/2.0), self.pts[n][1]-self.cell[n][1]/2.0]
+                            p2 = [min(self.pts[n][0]+self.cell[n][0]/2.0,self.pts[k][0]+self.cell[k][0]/2.0), self.pts[n][1]-self.cell[n][1]/2.0]
+                        if d == 2:
+                            p1 = [self.pts[n][0]-self.cell[n][0]/2.0, min(self.pts[n][1]+self.cell[n][1]/2.0,self.pts[k][1]+self.cell[k][1]/2.0)]
+                            p2 = [self.pts[n][0]-self.cell[n][0]/2.0, max(self.pts[n][1]-self.cell[n][1]/2.0,self.pts[k][1]-self.cell[k][1]/2.0)]
+                        if d == 3:
+                            p1 = [max(self.pts[n][0]-self.cell[n][0]/2.0,self.pts[k][0]-self.cell[k][0]/2.0), self.pts[n][1]+self.cell[n][1]/2.0]
+                            p2 = [min(self.pts[n][0]+self.cell[n][0]/2.0,self.pts[k][0]+self.cell[k][0]/2.0), self.pts[n][1]+self.cell[n][1]/2.0]
 
-#            col = color_dict[self.val[k][0]]
-            if val[0] == 3:
-                sw = str(1)
-                st = 'rgb(255,255,255)'
-            else:
-                sw = '0'
-                st = 'none'
-            style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:'+sw+';stroke:'+st
-            point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
-            atts = 'points="'+point_string+'"'
-            buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
+                        e_list.append([[p1[0]*c, ht-c*p1[1]],[p2[0]*c, ht-c*p2[1]]])
 
+            # put cells
+            if cells :
+                if layer_list[val[0]] == -1 :
+                    layer_list[val[0]] = [k]
+                else:
+                    layer_list[val[0]].append(k)
+
+# write cells        
+        for n in range(len(layer_list)):          
+            buffer.write('<g id="'+state_dict[n]+'">\n')
+            if layer_list[n] != -1:
+                for k in layer_list[n]:
+                    dx = c * self.cell[k][0]/2
+                    dy = c * self.cell[k][1]/2
+                    px = c * self.pts[k][0]
+                    py = ht - c * self.pts[k][1]
+                    pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
+                    val = self.val[k]
+
+                    col = color_dict[val[0]][int(val[2])]
+
+                    if val[0] == 3:
+                        sw = str(1)
+                        st = 'rgb(255,255,255)'
+                    else:
+                        sw = '0'
+                        st = 'none'
+                    style = 'fill:rgb('+str(int(255*col.r))+','+str(int(255*col.g))+','+str(int(255*col.b))+');stroke-width:'+sw+';stroke:'+st
+                    point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
+                    atts = 'points="'+point_string+'"'
+                    buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
+            buffer.write('</g>\n')
+
+        # write parcel edges
+        buffer.write('<g id="parcels">\n')
+        style = 'fill:none;stroke-width:1;stroke-dasharray:6,2,2,2;stroke:rgb(0,0,0)'
+        for e in e_list:           
+            point_string = 'x1="'+str(e[0][0])+'" y1="'+str(e[0][1])+'" x2="'+str(e[1][0])+'" y2="'+str(e[1][1])+'" '
+            buffer.write('<line '+point_string+' style="'+style+'"/>\n')
+        buffer.write('</g>\n')
 
         buffer.write('</svg>')
 
@@ -534,6 +590,10 @@ class History():
     def set_color_dict(self,_color_dict):
         self.color_dict = _color_dict
 
+    def set_dict(self,_color_dict,_state_dict):
+        self.color_dict = _color_dict
+        self.state_dict = _state_dict
+
     def set_rule(self,_string="default.txt"):
         self.rule_text = _string
 
@@ -557,8 +617,89 @@ class History():
         prob = self.param[0]/100.0
 
 #        while g < gen:
-        execfile(self.rule_text)
-#            g += 1
+#        execfile(self.rule_text)
+        # updated 07.02.2013
+        # new architecture 07.03.2013 revised - 07.19.2013
+        # 07.09.2013 charleston extensions : built or not built at access?
+        # 07.16.2013 made to work with variable values
+
+        no_states = len(self.state_dict)
+
+        while g < gen:
+            # add new generation
+            self.add_gen()
+            log_string = 'testing'
+            print ".",
+            # create list of enablers [access sites]
+            a_list = []
+            b_list = []
+
+            # create lists for each move type
+            for j in range(len(self.hist[g-1].val)):
+                if self.hist[g-1].val[j][0] == 0:
+                    neighbors = self.hist[g-1].neighbors(j, no_states)
+                
+                    street_count = len(neighbors[1])
+                    access_count = len(neighbors[2])
+                    built_count = len(neighbors[3])
+                    os_count = len(neighbors[4])
+            
+                    if street_count > 1 : 
+                        b_list.append([j,-1])
+                    else:
+                        if (street_count > 0) :
+                            p = random.choice(neighbors[1])
+                        elif (access_count > 0) :
+                            p = random.choice(neighbors[2])
+                        elif (built_count > 0) and (os_count > 0):
+                            p = random.choice(neighbors[3])  
+                        if len(p) > 0 :
+                            if (random.uniform(0.0,1.0) < prob) : b_list.append([j,p[1]])
+                            else: a_list.append([j,p[1]])                    
+
+            if (len(a_list) == 0) and (len(b_list) == 0) : 
+                self.log.append('no more building sites')
+                break
+
+            # create iterator lists - select_a and/or select_b
+            # this allows selection of one-at-a-time or all-at-once
+            if (self.param[3] == 0) or ((self.param[2] ==1) and (g == 1)) :
+                select_a = a_list
+                select_b = b_list
+            else:
+                select_a = []
+                select_b = []
+                if (random.uniform(0.0,1.0) < prob): select_a = [random.choice(a_list)]
+                else: select_b = [random.choice(b_list)]
+
+            # perform operation A
+            for cell in select_a:
+                if (self.hist[g-1].cell[cell[0]][0] <= self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= self.param[4]):
+                    self.hist[g].val[cell[0]][0:3] = [2,-1,0]
+                else:
+                    d_new = (cell[1]+1)%4
+                    new_half = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
+                    self.hist[g].val[new_half][0:3] = [3,-1,0]
+                    new_quarter = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
+                    self.hist[g].val[new_quarter][0:3] = [2,-1,0]
+
+            # perform operation B
+            for cell in select_b:
+                if (cell[1] == -1) or (self.hist[g-1].cell[cell[0]][0] <= self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= self.param[4]):
+                    self.hist[g].val[cell[0]][0:3] = [3,-1,0]
+                else:
+                    new_half = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
+                    self.hist[g].val[new_half][0:3] = [3,-1,0]
+                    d_new = (cell[1]+1)%4
+                    new_quarter = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
+                    self.hist[g].val[new_quarter][0:3] = [4,-1,0]
+
+                    
+
+
+            g += 1
+
+
         if self.param[2] == 1:
             self.hist[0] = self.hist[1]   
 #        self.hist[0].val = init_props
@@ -571,17 +712,17 @@ class History():
                 img = g.to_image(size,self.color_dict)
                 img.save(fname+str(i), base_path, True)
 
-    def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500),state_dict=dict()):
+    def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500)):
         for i,g in enumerate(self.hist):
             if (i%self.param[6] == 0) or (i+1== len(self.hist)):
-                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.vis_text)
+               g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict)
         for k in range(100//self.param[5]):
             g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.vis_text)
-        if len(state_dict) != 0:
+        if len(self.state_dict) != 0:
             print "writing to ",fname+"_m.csv"
-            np = len(state_dict)
+            np = len(self.state_dict)
             fout = open(base_path + os.sep + fname+"_m.csv",'w')
-            out_string = ",".join(['generation']+state_dict.values()+['action'])
+            out_string = ",".join(['generation']+self.state_dict.values()+['action'])
             fout.write(out_string+'\n')
             for i,g in enumerate(self.hist):
                 v = np * [0]
@@ -598,38 +739,6 @@ class History():
  #       fout.write('pause\n')
         fout.close()
  #       return base_path + os.sep + fname+".bat"
-
-    def write_animated_svgs(self, f_name="out", f_path=os.path.expanduser("~") + os.sep):
-        filepath = f_path + os.sep + f_name+".svg"
-        dur = 1
-        size = Interval(500,500)
-        for i,g in enumerate(self.hist):
-            g.to_svg(f_name+str(i), f_path,size,self.color_dict)
-
-        buffer = cStringIO.StringIO()
-        svg_size = ""
-        svg_size = 'width="'+str(1000)+'" height="'+str(1000)+'"'
-
-        buffer.write('<svg '+svg_size+' xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">\n')
-        
-        for i in range(len(self.hist)):
-            buffer.write('<image '+svg_size+' xlink:href="'+f_name+str(i)+'.svg">\n')
-            values = len(self.hist) * ["none"]
-            values[i] = "inline"
-            v_string = ";".join(values)
-            line_string ="<animate id='frame_"+str(i)+"' attributeName='display' values='"+v_string+"'"
-            line_string = line_string + " dur = '"+str(dur)+"s' fill='freeze' begin='"+str(i*dur)+"s' repeatCount='indefinite' />\n"
-            buffer.write(line_string)
-            buffer.write('</image>\n')
-       
-
-        buffer.write('</svg>')
-
-        # write buffer to file
-        fo = open(filepath, "wb")
-        fo.write( buffer.getvalue() )
-        fo.close()
-        buffer.close()
 
 
     def test(self,n=0):
