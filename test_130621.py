@@ -22,13 +22,15 @@ param[3] = 1                            # 0 = full (synchronous); 1 = select one
 param[5] = 40                           # ms per slide
 param[6] = 10                           # step size
 param[7] = (40,40)                      # model size
-param[8] = 0                            # block size
+param[8] = 0                            # block size ( in super-parcels
 param[9] = (400,400)                    # display size
 param[10] = 3                           # number of values in val_list
                                         # [0] = type of cell
                                         # [1] = direction from last cell
                                         # [2] = depth (or height)
                                         # [3] = parcel #
+param[11] = 1                           # number of units [increments] per super-parcel  
+param[12] = 0                           # continue after parcelization? (0 = no; 1 = yes)       
 no_gen = 10
 
 
@@ -155,7 +157,7 @@ if init_fname == "":
         init_r[0] = 1
         r.init_rvals([init_r,[-1],[0]])
     else:
-        r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10])
+        r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10], increment = param[11])
     r.to_csv(f_name,path)
 else:
     r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)

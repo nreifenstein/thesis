@@ -83,25 +83,57 @@ class Graph():
             v.append(vi)
         self.val = v
 
-    def init_block(self, model_size=Interval(40,40), block_size=Interval(20,20), init_val = 1, no_vals = 1):
+    def init_block(self, model_size=Interval(40,40), block_size=Interval(20,20), init_val = 1, no_vals = 1, increment = 1.0):
         mod_x = block_size.a + 1
         mod_y = block_size.b + 1
         c_x = (model_size.a + block_size.a) / 2
         c_y = (model_size.b + block_size.b) / 2
         v = (model_size.a * model_size.b) * [0]
+        nx = 0.0
+        ny = 0.0
 
         for i in range(model_size.a):
+            if ((i-c_x) % mod_x == 0): nx += 1.0/2.0
+            else: nx += increment/2.0
+            ny = 0.0
             for j in range(model_size.b):
+                
                 k = i+j*model_size.a
                 v[k] = no_vals * [0]
-                if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
-                    v[k][0] = 1
+                v[k][3] = -1
+                flag = 0
+                if ((i-c_x) % mod_x == 0): flag += 2
+                if ((j-c_y) % mod_y == 0): 
+                    flag += 1
+                    ny += 1.0 / 2.0
                 else:
-                    # simple parcelization
-                    t = j
-                    if i < model_size.a/2 : t = t * 100
-                    v[k][3] = t
+                    ny += increment / 2.0
+                if flag == 0:
+                    v[k][0] = 0
+                    v[k][3] = k
+                    self.cell[k] = [increment, increment,1.0]
+                if flag == 1:
+                    v[k][0] = 1
+                    self.cell[k] = [increment, 1.0, 1.0]
+                if flag == 2:
+                    v[k][0] = 1
+                    self.cell[k] = [1.0,increment,1.0]
+                if flag == 3:
+                    v[k][0] =1
+                    self.cell[k] = [1.0,1.0,1.0]
+                self.pts[k] = [nx, ny, 0.0]
+                ny += self.cell[k][1] / 2.0
+            nx += self.cell[k][0]/2.0
 
+
+
+#                if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
+#                    c
+#                else:
+#                    # simple parcelization
+#                    t = j
+#                    if i < model_size.a/2 : t = t * 100
+#                    v[k][3] = t
         self.val = v
 
     def init_ppm(self, init_fname = "in", path=os.path.expanduser("~") + os.sep,color_dict = {0:Color(0.0),1:Color(1.0)}):
@@ -178,21 +210,31 @@ class Graph():
                     self.link[i].append(j)
                     self.link[j].append(i)
                     
-    def direction(self,i,j):
+    def direction(self,i,j , tol = .001):
         WEST = 0
         NORTH = 1
         EAST = 2
         SOUTH = 3
-        p1 = self.pts[i]
-        p2 = self.pts[j]
-        dx = p1[0]-p2[0]
-        dy = p1[1]-p2[1]
-        if abs(dx) > abs(dy):
-            if dx > 0 : return EAST
-            else: return WEST
-        else:
-            if dy > 0 : return NORTH
-            return SOUTH
+        pt_i = self.pts[i]
+        cell_i = self.cell[i]
+        pt_j = self.pts[j]
+        cell_j = self.cell[j]
+        if abs((pt_i[0]-cell_i[0]/2.0) - (pt_j[0]+cell_j[0]/2.0)) < tol : return EAST
+        if abs((pt_j[0]-cell_j[0]/2.0) - (pt_i[0]+cell_i[0]/2.0)) < tol : return WEST
+        if abs((pt_j[1]-cell_j[1]/2.0) - (pt_i[1]+cell_i[1]/2.0)) < tol : return SOUTH
+        return NORTH
+
+
+#        p1 = self.pts[i]
+#        p2 = self.pts[j]
+#        dx = p1[0]-p2[0]
+#        dy = p1[1]-p2[1]
+#        if abs(dx) > abs(dy):
+#            if dx > 0 : return EAST
+#            else: return WEST
+#        else:
+#            if dy > 0 : return NORTH
+#            return SOUTH
             
             
     def neighbor(self, i,j, neighborhood_type = 1, epsilon = .01):
@@ -218,7 +260,10 @@ class Graph():
             return False
         else: return False
             
-    def divide(self,i,d,q):     ## i = cell index, d = direction, q = fraction
+    def divide(self,i,d,q, increment = True):     ## i = cell index, d = direction, q = fraction
+        if increment:
+            if increment > self.cell[i][d%2] : return i
+            q = q / self.cell[i][d%2]
         v = [[-1,0,0],[0,1,0],[1,0,0],[0,-1,0]]                                 # contains vector displacements for cardinal directions WNES
         scales = [[.5,1],[1,.5],[.5,1],[1,.5]]
         deltas = [[.5,0],[0,-.5],[-.5,0],[0,.5]]
@@ -286,13 +331,14 @@ class Graph():
                 result.append(self.val[i][k])
         return result
 
-    def neighbors(self, i, no_states = 2):      # create a list that stores index/direction pairs for each possible state
+    def neighbors(self, i, no_states = 2, include_other_parcels = True):      # create a list that stores index/direction pairs for each possible state
         result = no_states * [[]]
         for k in self.link[i]:
-            d = self.direction(k,i)
-            if result[self.val[k][0]] == [] : result[self.val[k][0]] = [(k,d)]
-            else: result[self.val[k][0]].append((k,d))
-            a = 1
+            if (self.val[k][3] == self.val[i][3]) or include_other_parcels:
+                d = self.direction(k,i)
+                if result[self.val[k][0]] == [] : result[self.val[k][0]] = [(k,d)]
+                else: result[self.val[k][0]].append((k,d))
+                a = 1
         return result
         
     def have_neighbor(self,mp,np):              # create list of cells with (1) vals in mp and (2) neighbors with np
@@ -401,10 +447,23 @@ class Graph():
 
     def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}):
         # quick and dirty svg writer
-        ht = cdim.b
+#        ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
 
-        c = min(cdim.a/self.size.a,cdim.b/self.size.b)
+
+        max_x = 0
+        max_y = 0
+        for i in range(len(self.pts)):
+            temp_x = self.pts[i][0] + self.cell[i][0]/2.0
+            if temp_x > max_x : max_x = temp_x
+            temp_y = self.pts[i][1] + self.cell[i][1]/2.0
+            if temp_y > max_y : max_y = temp_y
+
+
+        c = min(cdim.a/max_x,cdim.b/max_y)
+        ht = cdim.b
+
+#        c = min(cdim.a/self.size.a,cdim.b/self.size.b)
         print "drawing svg to "+filepath
 
         buffer = cStringIO.StringIO()
@@ -615,6 +674,7 @@ class History():
         g = 1
         init_props = copy.copy(self.hist[0].val)
         prob = self.param[0]/100.0
+        parcel_mode = True
 
 #        while g < gen:
 #        execfile(self.rule_text)
@@ -628,75 +688,167 @@ class History():
         while g < gen:
             # add new generation
             self.add_gen()
-            log_string = 'testing'
-            print ".",
-            # create list of enablers [access sites]
-            a_list = []
-            b_list = []
+            if parcel_mode:
+                log_string = 'parcelizing'
+                print "p",
+                p_list = []
 
-            # create lists for each move type
-            for j in range(len(self.hist[g-1].val)):
-                if self.hist[g-1].val[j][0] == 0:
-                    neighbors = self.hist[g-1].neighbors(j, no_states)
+                # look through parcels
+                for j in range(len(self.hist[g-1].val)):
+                    if (self.hist[g-1].val[j][0] == 0)  and (self.hist[g-1].val[j][3] > -1):
+                        # we have found a parcel
+                        # first, determine frontage
+                        neighbors = self.hist[g-1].neighbors(j, no_states)
+                        street_count = len(neighbors[1])
+                        frontage = 0.0
+                        # check if corner parcel with one dimension <= 2.0
+                        if street_count > 1:
+                            n_new = []
+                            for n in neighbors[1]:
+                                n_dir = (n[1]+1)%2
+                                if self.hist[g-1].cell[j][n_dir] > 2.0:
+                                    n_new.append(n)
+                            if n_new == []: 
+                                self.hist[g].val[j][0:3] = [3,-1,0]
+                            else: 
+                                neighbors[1] = n_new
+                            street_count = len(n_new)
+                        if street_count > 0 :
+                            f = random.choice(neighbors[1])
+                            f_index = (f[1]+1)%2
+                            frontage = self.hist[g-1].cell[j][f_index]
+                        if frontage > (1.0 + self.param[4]) :
+                            p_dir = [f[1], (f[1]+1)%4,(f[1]+3)%4]
+                            for p in neighbors[1]:
+                                if p[1] in p_dir: p_dir.remove(p[1])
+                            if p_dir != [] : p_list.append([j, random.choice(p_dir),f[1]])
+#                        elif (frontage > 0) and (frontage < 1.0):
+                            # experimental - turn into an alley?
+#                            self.hist[g].val[j] = [1,0,0,-1]
+
+                # tester
+
+                if p_list == []:
+                    self.log.append('no more subdivision sites')
+                    if self.param[12] == 0: break
+                    else: parcel_mode = False
+                else:
+                    par = random.choice(p_list)
+
+                    # do parcel subdivision
+                    if (random.uniform(0.0,1.0) < prob) : amt = 1.0
+                    else: amt = 1.0 + self.param[4]
+                    # create new parcel
+                    new_p = self.hist[g].divide(par[0],par[1], amt)
+                    self.hist[g].val[new_p][3] = new_p
+
+                    # front increment
+                    new_c = self.hist[g].divide(new_p,par[2],1)
+                    new_built = self.hist[g].divide(new_c,par[1],.75)
+
+                    # take away corner
+                    if amt == 1.0: self.hist[g].val[new_c][0:3] = [4,-1,0]
+                    else: self.hist[g].val[new_c][0:3] = [2,-1,0]
+                    self.hist[g].val[new_built][0:3] = [3,-1,0]
+                    log_string = 'p '+str(amt)+' ['+str(par[0])+','+str(par[1])+'] : '+str(new_p)+' blt on '+str(new_c)
+
+
+
+            else:
+                log_string = 'testing'
+                print ".",
+                # create list of enablers [access sites]
+                a_list = []
+                b_list = []
+
+                # create lists for each move type
+                for j in range(len(self.hist[g-1].val)):
+                    if self.hist[g-1].val[j][0] == 0:
+                        neighbors = self.hist[g-1].neighbors(j, no_states,  include_other_parcels = False)
                 
-                    street_count = len(neighbors[1])
-                    access_count = len(neighbors[2])
-                    built_count = len(neighbors[3])
-                    os_count = len(neighbors[4])
+                        street_count = len(neighbors[1])
+                        access_count = len(neighbors[2])
+                        built_count = len(neighbors[3])
+                        os_count = len(neighbors[4])
             
-                    if street_count > 1 : 
-                        b_list.append([j,-1])
-                    else:
-                        if (street_count > 0) :
+                        if street_count > 1 : 
+                            b_list.append([j,-1])
+                        elif (street_count > 0) :
                             p = random.choice(neighbors[1])
+                            if (random.uniform(0.0,1.0) < prob) : b_list.append([j,p[1]])
+                            else: a_list.append([j,p[1]])
                         elif (access_count > 0) :
                             p = random.choice(neighbors[2])
-                        elif (built_count > 0) and (os_count > 0):
-                            p = random.choice(neighbors[3])  
-                        if len(p) > 0 :
                             if (random.uniform(0.0,1.0) < prob) : b_list.append([j,p[1]])
-                            else: a_list.append([j,p[1]])                    
+                            else: a_list.append([j,p[1]])
+                        elif (built_count > 0) and (os_count > 0):
+                            p = random.choice(neighbors[3]) 
+                            b_list.append([j,p[1]])              
 
-            if (len(a_list) == 0) and (len(b_list) == 0) : 
-                self.log.append('no more building sites')
-                break
+                if (len(a_list) == 0) and (len(b_list) == 0) : 
+                    self.log.append('no more building sites')
+                    break
 
-            # create iterator lists - select_a and/or select_b
-            # this allows selection of one-at-a-time or all-at-once
-            if (self.param[3] == 0) or ((self.param[2] ==1) and (g == 1)) :
-                select_a = a_list
-                select_b = b_list
-            else:
-                select_a = []
-                select_b = []
-                if (random.uniform(0.0,1.0) < prob): select_a = [random.choice(a_list)]
-                else: select_b = [random.choice(b_list)]
-
-            # perform operation A
-            for cell in select_a:
-                if (self.hist[g-1].cell[cell[0]][0] <= self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= self.param[4]):
-                    self.hist[g].val[cell[0]][0:3] = [2,-1,0]
+                # create iterator lists - select_a and/or select_b
+                # this allows selection of one-at-a-time or all-at-once
+                if (self.param[3] == 0) or ((self.param[2] ==1) and (g == 1)) :
+                    select_a = a_list
+                    select_b = b_list
                 else:
-                    d_new = (cell[1]+1)%4
-                    new_half = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
-                    self.hist[g].val[new_half][0:3] = [3,-1,0]
-                    new_quarter = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
-                    self.hist[g].val[new_quarter][0:3] = [2,-1,0]
+                    select_a = []
+                    select_b = []
+                    if (random.uniform(0.0,1.0) < prob) and len(a_list) > 0: select_a = [random.choice(a_list)]
+                    elif len(b_list) > 0: select_b = [random.choice(b_list)]
 
-            # perform operation B
-            for cell in select_b:
-                if (cell[1] == -1) or (self.hist[g-1].cell[cell[0]][0] <= self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= self.param[4]):
-                    self.hist[g].val[cell[0]][0:3] = [3,-1,0]
-                else:
-                    new_half = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
-                    self.hist[g].val[new_half][0:3] = [3,-1,0]
-                    d_new = (cell[1]+1)%4
-                    new_quarter = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
-                    self.hist[g].val[new_quarter][0:3] = [4,-1,0]
+                # perform operation A
+                for cell in select_a:
+                    log_string = 'a '+str(cell[0])+" ; "+str(cell[1])
+                    if (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
+                        self.hist[g].val[cell[0]][0:3] = [2,-1,0]
+                    else:
+                        # find access in neighborhood
+                        for n in self.hist[g-1].link[cell[0]]:
+                            if (self.hist[g-1].val[n][0] == 1) or (self.hist[g-1].val[n][0] == 2): 
+                                if self.hist[g-1].direction(n,cell[0]) == cell[1]:
+                                    k = n
+                        # compare center points of cells
+                        if cell[1]%2 == 0:
+                            if self.hist[g-1].pts[k][1] > self.hist[g-1].pts[cell[0]][1]: new_dir = 1
+                            else: new_dir = 3
+                        else:
+                            if self.hist[g-1].pts[k][0] > self.hist[g-1].pts[cell[0]][0]: new_dir = 2
+                            else: new_dir = 0
 
-                    
+                        # carve out the new increment
+                        d_new = cell[1]%4
+                        new_cell = self.hist[g].divide(cell[0], d_new, 1.0)
+                        new_access = self.hist[g].divide(new_cell, new_dir, 2*self.param[4])
+                        self.hist[g].val[new_access][0:3] = [2,-1,0]
 
 
+                        '''
+                        d_new = (cell[1]+1)%4
+                        new_half = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
+                        self.hist[g].val[new_half][0:3] = [3,-1,0]
+                        new_quarter = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
+                        self.hist[g].val[new_quarter][0:3] = [2,-1,0]
+                        '''
+
+                # perform operation B
+                for cell in select_b:
+                    if cell[0] == 89:
+                        print
+                    log_string = 'b '+str(cell[0])+" ; "+str(cell[1])
+                    if (cell[1] == -1) or (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
+                        self.hist[g].val[cell[0]][0:3] = [0,-1,0]
+                    else:
+                        # carve out the new increment
+                        d_new = cell[1]
+                        new_cell = self.hist[g].divide(cell[0], d_new, 1.0)
+                        self.hist[g].val[new_cell][0:3] = [3,-1,0]
+
+#            print log_string                    
+            self.log.append(log_string)            
             g += 1
 
 
@@ -713,9 +865,10 @@ class History():
                 img.save(fname+str(i), base_path, True)
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500)):
+
         for i,g in enumerate(self.hist):
             if (i%self.param[6] == 0) or (i+1== len(self.hist)):
-               g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict)
+                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict)
         for k in range(100//self.param[5]):
             g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.vis_text)
         if len(self.state_dict) != 0:
