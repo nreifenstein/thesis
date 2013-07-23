@@ -41,8 +41,8 @@ class Graph():
 
     def init_rectgrid(self,size=Interval(20,20),include_corners=False,wrap=False,cellsize=1):
         self.size = size
-        m = size.a
-        n = size.b
+        m = int(size.a)
+        n = int(size.b)
         cellhalf = cellsize/2.0
         # initialize lists
         pts = []
@@ -88,17 +88,17 @@ class Graph():
         mod_y = block_size.b + 1
         c_x = (model_size.a + block_size.a) / 2
         c_y = (model_size.b + block_size.b) / 2
-        v = (model_size.a * model_size.b) * [0]
+        v = int(model_size.a * model_size.b) * [0]
         nx = 0.0
         ny = 0.0
 
-        for i in range(model_size.a):
+        for i in range(int(model_size.a)):
             if ((i-c_x) % mod_x == 0): nx += 1.0/2.0
             else: nx += increment/2.0
             ny = 0.0
-            for j in range(model_size.b):
+            for j in range(int(model_size.b)):
                 
-                k = i+j*model_size.a
+                k = i+j*int(model_size.a)
                 v[k] = no_vals * [0]
                 v[k][3] = -1
                 flag = 0
@@ -224,18 +224,6 @@ class Graph():
         if abs((pt_j[1]-cell_j[1]/2.0) - (pt_i[1]+cell_i[1]/2.0)) < tol : return SOUTH
         return NORTH
 
-
-#        p1 = self.pts[i]
-#        p2 = self.pts[j]
-#        dx = p1[0]-p2[0]
-#        dy = p1[1]-p2[1]
-#        if abs(dx) > abs(dy):
-#            if dx > 0 : return EAST
-#            else: return WEST
-#        else:
-#            if dy > 0 : return NORTH
-#            return SOUTH
-            
             
     def neighbor(self, i,j, neighborhood_type = 1, epsilon = .01):
         if i == j : return False                   
@@ -334,7 +322,7 @@ class Graph():
     def neighbors(self, i, no_states = 2, include_other_parcels = True):      # create a list that stores index/direction pairs for each possible state
         result = no_states * [[]]
         for k in self.link[i]:
-            if (self.val[k][3] == self.val[i][3]) or include_other_parcels:
+            if (self.val[k][0] == 1) or (self.val[k][3] == self.val[i][3]) or include_other_parcels:
                 d = self.direction(k,i)
                 if result[self.val[k][0]] == [] : result[self.val[k][0]] = [(k,d)]
                 else: result[self.val[k][0]].append((k,d))
@@ -445,7 +433,7 @@ class Graph():
         self._res = len(val)
 
 
-    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}):
+    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}, parcels = True, cells = True):
         # quick and dirty svg writer
 #        ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
@@ -476,9 +464,6 @@ class Graph():
 
         e_list = []
         layer_list = len(state_dict) * [-1]
-
-        parcels = True
-        cells = True
 
         for k in range(len(self.val)):
             dx = c * self.cell[k][0]/2
@@ -705,7 +690,8 @@ class History():
                         if street_count > 1:
                             n_new = []
                             for n in neighbors[1]:
-                                n_dir = (n[1]+1)%2
+                                n_dir = n[1] %2
+                                #n_dir = (n[1]+1)%4
                                 if self.hist[g-1].cell[j][n_dir] > 2.0:
                                     n_new.append(n)
                             if n_new == []: 
@@ -717,7 +703,7 @@ class History():
                             f = random.choice(neighbors[1])
                             f_index = (f[1]+1)%2
                             frontage = self.hist[g-1].cell[j][f_index]
-                        if frontage > (1.0 + self.param[4]) :
+                        if frontage >= 1.0 + (2 * self.param[4]) :
                             p_dir = [f[1], (f[1]+1)%4,(f[1]+3)%4]
                             for p in neighbors[1]:
                                 if p[1] in p_dir: p_dir.remove(p[1])
@@ -731,16 +717,30 @@ class History():
                 if p_list == []:
                     self.log.append('no more subdivision sites')
                     if self.param[12] == 0: break
-                    else: parcel_mode = False
+                    else: 
+                        parcel_mode = False
+                        if self.param[17] == 1:
+                            # make alleys
+                            for k in range(len(self.hist[g].val)):
+                                min_dim = min(self.hist[g].cell[k][0:2])
+                                max_dim = max(self.hist[g].cell[k][0:2])
+                                if (min_dim <= 2 * self.param[4]) and (max_dim == self.param[11]) and self.hist[g].val[k][0] == 0:
+                                    self.hist[g].val[k] = [1,-1,0,-1]
+
                 else:
                     par = random.choice(p_list)
 
                     # do parcel subdivision
-                    if (random.uniform(0.0,1.0) < prob) : amt = 1.0
-                    else: amt = 1.0 + self.param[4]
+                    if min(self.hist[g-1].cell[par[0]][0:2]) < 2:
+                        amt = 0
+                    else:
+                        if (random.uniform(0.0,1.0) < prob) : amt = 1.0
+                        else: amt = 1.0 + self.param[4]
                     # create new parcel
-                    new_p = self.hist[g].divide(par[0],par[1], amt)
-                    self.hist[g].val[new_p][3] = new_p
+                    if amt > 0 :
+                        new_p = self.hist[g].divide(par[0],par[1], amt)
+                        self.hist[g].val[new_p][3] = new_p
+                    else: new_p = par[0]
 
                     # front increment
                     new_c = self.hist[g].divide(new_p,par[2],1)
@@ -752,7 +752,11 @@ class History():
                     self.hist[g].val[new_built][0:3] = [3,-1,0]
                     log_string = 'p '+str(amt)+' ['+str(par[0])+','+str(par[1])+'] : '+str(new_p)+' blt on '+str(new_c)
 
+                    # create increments for rest of lot
+                    m = int(max(self.hist[g].cell[new_p][0], self.hist[g].cell[new_p][0]))
 
+                    for i in range(m-1):
+                        self.hist[g].divide(new_p,par[2],1)
 
             else:
                 log_string = 'testing'
@@ -760,11 +764,13 @@ class History():
                 # create list of enablers [access sites]
                 a_list = []
                 b_list = []
+                merge_chance = (random.randint(0,100) < self.param[14])
 
                 # create lists for each move type
                 for j in range(len(self.hist[g-1].val)):
                     if self.hist[g-1].val[j][0] == 0:
-                        neighbors = self.hist[g-1].neighbors(j, no_states,  include_other_parcels = False)
+                        
+                        neighbors = self.hist[g-1].neighbors(j, no_states,  include_other_parcels = merge_chance )
                 
                         street_count = len(neighbors[1])
                         access_count = len(neighbors[2])
@@ -772,18 +778,22 @@ class History():
                         os_count = len(neighbors[4])
             
                         if street_count > 1 : 
-                            b_list.append([j,-1])
+                            b_list.append([j,-1,-1])
                         elif (street_count > 0) :
                             p = random.choice(neighbors[1])
-                            if (random.uniform(0.0,1.0) < prob) : b_list.append([j,p[1]])
-                            else: a_list.append([j,p[1]])
-                        elif (access_count > 0) :
-                            p = random.choice(neighbors[2])
-                            if (random.uniform(0.0,1.0) < prob) : b_list.append([j,p[1]])
-                            else: a_list.append([j,p[1]])
+                            #if (random.uniform(0.0,1.0) < prob) : 
+                            b_list.append([j,p[1],p[0]])
+                            #else: 
+                            a_list.append([j,p[1],p[0]])
+                        elif (access_count > 0) and (built_count > 0):
+                            p = random.choice(neighbors[2]+neighbors[3])
+                            #if (random.uniform(0.0,1.0) < prob) : 
+                            b_list.append([j,p[1],p[0]])
+                            #else: 
+                            a_list.append([j,p[1],p[0]])
                         elif (built_count > 0) and (os_count > 0):
                             p = random.choice(neighbors[3]) 
-                            b_list.append([j,p[1]])              
+                            b_list.append([j,p[1],p[0]])              
 
                 if (len(a_list) == 0) and (len(b_list) == 0) : 
                     self.log.append('no more building sites')
@@ -797,12 +807,26 @@ class History():
                 else:
                     select_a = []
                     select_b = []
-                    if (random.uniform(0.0,1.0) < prob) and len(a_list) > 0: select_a = [random.choice(a_list)]
+                    if (random.uniform(0.0,1.0) > prob) and len(a_list) > 0: select_a = [random.choice(a_list)]
                     elif len(b_list) > 0: select_b = [random.choice(b_list)]
 
                 # perform operation A
                 for cell in select_a:
                     log_string = 'a '+str(cell[0])+" ; "+str(cell[1])
+
+
+                    # check if a different parcel
+                    to_parcel = self.hist[g-1].val[cell[0]][3]
+                    from_parcel = self.hist[g-1].val[cell[2]][3]
+
+                    if (merge_chance) and (to_parcel > -1) and (from_parcel > -1) :
+                        # merge the cells!
+                        log_string = log_string +' merge'
+                        for p in range(len(self.hist[g-1].val)):
+                            if self.hist[g-1].val[p][3] == from_parcel: self.hist[g].val[p][3] = to_parcel
+
+
+                    # continue
                     if (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
                         self.hist[g].val[cell[0]][0:3] = [2,-1,0]
                     else:
@@ -825,22 +849,25 @@ class History():
                         new_access = self.hist[g].divide(new_cell, new_dir, 2*self.param[4])
                         self.hist[g].val[new_access][0:3] = [2,-1,0]
 
-
-                        '''
-                        d_new = (cell[1]+1)%4
-                        new_half = self.hist[g].divide(cell[0], d_new, 1.0 - (self.param[4]))
-                        self.hist[g].val[new_half][0:3] = [3,-1,0]
-                        new_quarter = self.hist[g].divide(cell[0], cell[1], 1.0 - (self.param[4]))
-                        self.hist[g].val[new_quarter][0:3] = [2,-1,0]
-                        '''
-
                 # perform operation B
                 for cell in select_b:
-                    if cell[0] == 89:
-                        print
                     log_string = 'b '+str(cell[0])+" ; "+str(cell[1])
+
+                    # check if a different parcel
+                    to_parcel = self.hist[g-1].val[cell[0]][3]
+                    from_parcel = self.hist[g-1].val[cell[2]][3]
+
+                    #if (to_parcel != from_parcel) and (from_parcel > -1):
+                    if (merge_chance) and (to_parcel > -1) and (from_parcel > -1) :
+                        # merge the cells!
+                        log_string = log_string +' merge'
+                        for p in range(len(self.hist[g-1].val)):
+                            if self.hist[g-1].val[p][3] == from_parcel: self.hist[g].val[p][3] = to_parcel
+
+                    # continue
+
                     if (cell[1] == -1) or (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
-                        self.hist[g].val[cell[0]][0:3] = [0,-1,0]
+                        self.hist[g].val[cell[0]][0:3] = [3,-1,0]
                     else:
                         # carve out the new increment
                         d_new = cell[1]
@@ -868,9 +895,9 @@ class History():
 
         for i,g in enumerate(self.hist):
             if (i%self.param[6] == 0) or (i+1== len(self.hist)):
-                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict)
+                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict, parcels = (self.param[16] == 1), cells = (self.param[15] == 1))
         for k in range(100//self.param[5]):
-            g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.vis_text)
+            g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.state_dict, parcels = (self.param[16] == 1), cells = (self.param[15] == 1))
         if len(self.state_dict) != 0:
             print "writing to ",fname+"_m.csv"
             np = len(self.state_dict)

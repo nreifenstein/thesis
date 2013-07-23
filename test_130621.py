@@ -30,7 +30,12 @@ param[10] = 3                           # number of values in val_list
                                         # [2] = depth (or height)
                                         # [3] = parcel #
 param[11] = 1                           # number of units [increments] per super-parcel  
-param[12] = 0                           # continue after parcelization? (0 = no; 1 = yes)       
+param[12] = 0                           # continue after parcelization? (0 = no; 1 = yes) 
+param[14] = 0                           # chance of a parcel merge (/100) 
+param[15] = 1                           # p15 : plot usage ( 0 = no; 1 = yes)
+param[16] = 1                           # p16 : plot parcels (0 = no; 1 = yes)
+param[17] = 0                           # p17 : allow emergent alleys (0 = no; 1 = yes)
+    
 no_gen = 10
 
 
@@ -102,7 +107,7 @@ for line in fin:
 fin.close()
 
 # convert param list to working params
-model_size = Interval(param[7][0],param[7][1])
+model_size = Interval(int(param[7][0]),int(param[7][1]))
 if param[8] != 0:
     block_size = Interval(param[8][0],param[8][1])
 else:
