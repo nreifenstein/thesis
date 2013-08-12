@@ -35,6 +35,8 @@ param[14] = 0                           # chance of a parcel merge (/100)
 param[15] = 1                           # p15 : plot usage ( 0 = no; 1 = yes)
 param[16] = 1                           # p16 : plot parcels (0 = no; 1 = yes)
 param[17] = 0                           # p17 : allow emergent alleys (0 = no; 1 = yes)
+param[18] = 0                           # p18 : develop parcels (0 = no; 1 = yes)
+param[19] = 12                          # p19 : size of min. parcel increment
     
 no_gen = 10
 
@@ -165,8 +167,8 @@ if init_fname == "":
         r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10], increment = param[11])
     r.to_csv(f_name,path)
 else:
-    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
-#    r.from_csv(init_fname,base_path)
+#    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
+    r.from_csv(init_fname,base_path)
 
 if out_fname != "":
     r.to_csv(out_fname,base_path)
@@ -184,6 +186,7 @@ t.generate(no_gen)
 
 t.write_svgs(f_name,path, display_size)
 t.hist[-1].neighbors(13,len(state_dict))
+t.hist[-1].to_csv(f_name,path)
 
 
 def a_count(v,i,a):

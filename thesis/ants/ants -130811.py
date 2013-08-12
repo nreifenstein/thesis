@@ -35,7 +35,6 @@ class Graph():
                 new_val.append(j)
             new_vals.append(new_val)
         self.val = new_vals
-        self.size = Interval(0,len(new_vals))
 
     @property
     def _res(self):  return len(self.val)
@@ -403,14 +402,14 @@ class Graph():
                 if n == 0:
                     no_vals = int(row[2])
                     u = no_vals+4
-                    self.size = Interval(int(float(row[0])),int(float(row[1])))
+                    self.size = Interval(int(row[0]),int(row[1]))
                 if n > 1:
                     pts.append([float(row[1]),float(row[2]),float(row[3])])
 
                     v = []
                     for i in range(4,u): 
                         if row[i] == "" : row[i] = "0"
-                        v.append(int(float(row[i])))
+                        v.append(int(row[i]))
                     val.append(v)
                     c = []
                     for i in range(u,u+3): c.append(float(row[i]))
@@ -660,8 +659,7 @@ class History():
         g = 1
         init_props = copy.copy(self.hist[0].val)
         prob = self.param[0]/100.0
-        parcel_mode = (self.param[18] == 1)
-        min_size = self.param[19]
+        parcel_mode = True
 
 #        while g < gen:
 #        execfile(self.rule_text)
@@ -673,8 +671,6 @@ class History():
         no_states = len(self.state_dict)
 
         while g < gen:
-            if g == 60:
-                print
             # add new generation
             self.add_gen()
             if parcel_mode:
@@ -696,7 +692,7 @@ class History():
                             for n in neighbors[1]:
                                 n_dir = n[1] %2
                                 #n_dir = (n[1]+1)%4
-                                if self.hist[g-1].cell[j][n_dir] > (2.0 * min_size) :
+                                if self.hist[g-1].cell[j][n_dir] > 2.0:
                                     n_new.append(n)
                             if n_new == []: 
                                 self.hist[g].val[j][0:3] = [3,-1,0]
@@ -707,7 +703,7 @@ class History():
                             f = random.choice(neighbors[1])
                             f_index = (f[1]+1)%2
                             frontage = self.hist[g-1].cell[j][f_index]
-                        if frontage >= 2.0 * min_size :
+                        if frontage >= 1.0 + (2 * self.param[4]) :
                             p_dir = [f[1], (f[1]+1)%4,(f[1]+3)%4]
                             for p in neighbors[1]:
                                 if p[1] in p_dir: p_dir.remove(p[1])
@@ -735,11 +731,11 @@ class History():
                     par = random.choice(p_list)
 
                     # do parcel subdivision
-                    if min(self.hist[g-1].cell[par[0]][0:2]) < (2.0 * min_size):
+                    if min(self.hist[g-1].cell[par[0]][0:2]) < 2:
                         amt = 0
                     else:
-                        if (random.uniform(0.0,1.0) < prob) : amt = min_size
-                        else: amt = 2 * min_size
+                        if (random.uniform(0.0,1.0) < prob) : amt = 1.0
+                        else: amt = 1.0 + self.param[4]
                     # create new parcel
                     if amt > 0 :
                         new_p = self.hist[g].divide(par[0],par[1], amt)
@@ -747,8 +743,8 @@ class History():
                     else: new_p = par[0]
 
                     # front increment
-                    new_c = self.hist[g].divide(new_p,par[2],min_size)
-                    new_built = self.hist[g].divide(new_c,par[1],2*min_size)
+                    new_c = self.hist[g].divide(new_p,par[2],1)
+                    new_built = self.hist[g].divide(new_c,par[1],.75)
 
                     # take away corner
                     if amt == 1.0: self.hist[g].val[new_c][0:3] = [4,-1,0]
@@ -760,7 +756,7 @@ class History():
                     m = int(max(self.hist[g].cell[new_p][0], self.hist[g].cell[new_p][0]))
 
                     for i in range(m-1):
-                        self.hist[g].divide(new_p,par[2],min_size)
+                        self.hist[g].divide(new_p,par[2],1)
 
             else:
                 log_string = 'testing'
@@ -771,7 +767,6 @@ class History():
                 merge_chance = (random.randint(0,100) < self.param[14])
 
                 # create lists for each move type
-                # cell[0] = index of target cell, cell[1] = direction, cell[2] = index of enabling cell
                 for j in range(len(self.hist[g-1].val)):
                     if self.hist[g-1].val[j][0] == 0:
                         
@@ -790,8 +785,8 @@ class History():
                             b_list.append([j,p[1],p[0]])
                             #else: 
                             a_list.append([j,p[1],p[0]])
-                        elif (access_count > 0) :
-                            p = random.choice(neighbors[2])
+                        elif (access_count > 0) and (built_count > 0):
+                            p = random.choice(neighbors[2]+neighbors[3])
                             #if (random.uniform(0.0,1.0) < prob) : 
                             b_list.append([j,p[1],p[0]])
                             #else: 
@@ -819,6 +814,7 @@ class History():
                 for cell in select_a:
                     log_string = 'a '+str(cell[0])+" ; "+str(cell[1])
 
+
                     # check if a different parcel
                     to_parcel = self.hist[g-1].val[cell[0]][3]
                     from_parcel = self.hist[g-1].val[cell[2]][3]
@@ -831,7 +827,7 @@ class History():
 
 
                     # continue
-                    if (self.hist[g-1].cell[cell[0]][0] <= 2*min_size) or (self.hist[g-1].cell[cell[0]][1] <= 2*min_size):
+                    if (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
                         self.hist[g].val[cell[0]][0:3] = [2,-1,0]
                     else:
                         # find access in neighborhood
@@ -849,13 +845,8 @@ class History():
 
                         # carve out the new increment
                         d_new = cell[1]%4
-                        depth = self.hist[g].cell[cell[0]][d_new%2]
-                        if depth >= 4*min_size: 
-                            new_size = 2*min_size
-                            new_cell = self.hist[g].divide(cell[0], d_new, new_size)
-                        else:
-                            new_cell = cell[0]
-                        new_access = self.hist[g].divide(new_cell, new_dir, min_size)
+                        new_cell = self.hist[g].divide(cell[0], d_new, 1.0)
+                        new_access = self.hist[g].divide(new_cell, new_dir, 2*self.param[4])
                         self.hist[g].val[new_access][0:3] = [2,-1,0]
 
                 # perform operation B
@@ -880,12 +871,7 @@ class History():
                     else:
                         # carve out the new increment
                         d_new = cell[1]
-                        depth = self.hist[g].cell[cell[0]][d_new%2]
-                        if depth >= 4*min_size: 
-                            new_size = 2*min_size
-                            new_cell = self.hist[g].divide(cell[0], d_new, new_size)
-                        else:
-                                new_cell = cell[0]
+                        new_cell = self.hist[g].divide(cell[0], d_new, 1.0)
                         self.hist[g].val[new_cell][0:3] = [3,-1,0]
 
 #            print log_string                    
