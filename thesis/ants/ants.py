@@ -126,15 +126,6 @@ class Graph():
                 ny += self.cell[k][1] / 2.0
             nx += self.cell[k][0]/2.0
 
-
-
-#                if ((i-c_x) % mod_x == 0) or ((j-c_y) % mod_y == 0):
-#                    c
-#                else:
-#                    # simple parcelization
-#                    t = j
-#                    if i < model_size.a/2 : t = t * 100
-#                    v[k][3] = t
         self.val = v
 
     def init_ppm(self, init_fname = "in", path=os.path.expanduser("~") + os.sep,color_dict = {0:Color(0.0),1:Color(1.0)}):
@@ -169,7 +160,6 @@ class Graph():
                 counter +=3
         self.val = vals
 
-
     def to_file(self,fname=os.path.expanduser("~") + os.sep + 'out.txt'):
 #        import os
 #        path = os.path.expanduser("~") + os.sep + fname
@@ -193,9 +183,7 @@ class Graph():
         self.pts = eval(lines[1])
         self.val = eval(lines[2])
         self.cell = eval(lines[3])
-
-
-        
+      
     def addcell(self, _link, _pt, _cell,_val):
         self.link.append(_link)
         self.pts.append(_pt)
@@ -224,8 +212,7 @@ class Graph():
         if abs((pt_j[0]-cell_j[0]/2.0) - (pt_i[0]+cell_i[0]/2.0)) < tol : return WEST
         if abs((pt_j[1]-cell_j[1]/2.0) - (pt_i[1]+cell_i[1]/2.0)) < tol : return SOUTH
         return NORTH
-
-            
+           
     def neighbor(self, i,j, neighborhood_type = 1, epsilon = .01):
         if i == j : return False                   
         p1 = self.pts[i]
@@ -279,8 +266,7 @@ class Graph():
                     self.link[j].append(k)
                     self.link[k].append(j)
         return new_i
-        
-        
+               
     def combine(self,i,j):
         print "testing ",i,j
         if not(self.neighbor(i,j)) : return False          # are not adjacent
@@ -338,11 +324,21 @@ class Graph():
                     result.append(i)
         return result
 
-    def to_image(self,pixel_res = Interval(20,20),color_dict = {0:Color(0.0),1:Color(1.0)}, default_color = Color(0.0)):
-        img = Image(pixel_res,default_color)
-        for n, val in enumerate(self.val):
-            img._pixels[n] = color_dict[val[0]]
-        return img
+    def parcel_list(self):
+        # get number if parcels
+        no_par = -1
+        for i in range(len(self.val)):
+            if self.val[i][3] > no_par : no_par = self.val[i][3]
+
+        # initialize result
+        result = []
+        for i in range(no_par+1) : result.append([])
+
+        # fill out list
+        for i in range(len(self.val)):
+            if self.val[i][3] != -1: result[self.val[i][3]].append(i)
+
+        return result
 
     def to_dc_svg(self,f_name="svg_out", path = os.path.expanduser("~"), color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
         # this uses Decodes. OK for nodes and link, slow for cells.
@@ -673,7 +669,7 @@ class History():
         no_states = len(self.state_dict)
 
         while g < gen:
-            if g == 60:
+            if g == 27:
                 print
             # add new generation
             self.add_gen()
@@ -681,212 +677,77 @@ class History():
                 log_string = 'parcelizing'
                 print "p",
                 p_list = []
-
-                # look through parcels
-                for j in range(len(self.hist[g-1].val)):
-                    if (self.hist[g-1].val[j][0] == 0)  and (self.hist[g-1].val[j][3] > -1):
-                        # we have found a parcel
-                        # first, determine frontage
-                        neighbors = self.hist[g-1].neighbors(j, no_states)
-                        street_count = len(neighbors[1])
-                        frontage = 0.0
-                        # check if corner parcel with one dimension <= 2.0
-                        if street_count > 1:
-                            n_new = []
-                            for n in neighbors[1]:
-                                n_dir = n[1] %2
-                                #n_dir = (n[1]+1)%4
-                                if self.hist[g-1].cell[j][n_dir] > (2.0 * min_size) :
-                                    n_new.append(n)
-                            if n_new == []: 
-                                self.hist[g].val[j][0:3] = [3,-1,0]
-                            else: 
-                                neighbors[1] = n_new
-                            street_count = len(n_new)
-                        if street_count > 0 :
-                            f = random.choice(neighbors[1])
-                            f_index = (f[1]+1)%2
-                            frontage = self.hist[g-1].cell[j][f_index]
-                        if frontage >= 2.0 * min_size :
-                            p_dir = [f[1], (f[1]+1)%4,(f[1]+3)%4]
-                            for p in neighbors[1]:
-                                if p[1] in p_dir: p_dir.remove(p[1])
-                            if p_dir != [] : p_list.append([j, random.choice(p_dir),f[1]])
-#                        elif (frontage > 0) and (frontage < 1.0):
-                            # experimental - turn into an alley?
-#                            self.hist[g].val[j] = [1,0,0,-1]
-
-                # tester
-
-                if p_list == []:
-                    self.log.append('no more subdivision sites')
-                    if self.param[12] == 0: break
-                    else: 
-                        parcel_mode = False
-                        if self.param[17] == 1:
-                            # make alleys
-                            for k in range(len(self.hist[g].val)):
-                                min_dim = min(self.hist[g].cell[k][0:2])
-                                max_dim = max(self.hist[g].cell[k][0:2])
-                                if (min_dim <= 2 * self.param[4]) and (max_dim == self.param[11]) and self.hist[g].val[k][0] == 0:
-                                    self.hist[g].val[k] = [1,-1,0,-1]
-
-                else:
-                    par = random.choice(p_list)
-
-                    # do parcel subdivision
-                    if min(self.hist[g-1].cell[par[0]][0:2]) < (2.0 * min_size):
-                        amt = 0
-                    else:
-                        if (random.uniform(0.0,1.0) < prob) : amt = min_size
-                        else: amt = 2 * min_size
-                    # create new parcel
-                    if amt > 0 :
-                        new_p = self.hist[g].divide(par[0],par[1], amt)
-                        self.hist[g].val[new_p][3] = new_p
-                    else: new_p = par[0]
-
-                    # front increment
-                    new_c = self.hist[g].divide(new_p,par[2],min_size)
-                    new_built = self.hist[g].divide(new_c,par[1],2*min_size)
-
-                    # take away corner
-                    if amt == 1.0: self.hist[g].val[new_c][0:3] = [4,-1,0]
-                    else: self.hist[g].val[new_c][0:3] = [2,-1,0]
-                    self.hist[g].val[new_built][0:3] = [3,-1,0]
-                    log_string = 'p '+str(amt)+' ['+str(par[0])+','+str(par[1])+'] : '+str(new_p)+' blt on '+str(new_c)
-
-                    # create increments for rest of lot
-                    m = int(max(self.hist[g].cell[new_p][0], self.hist[g].cell[new_p][0]))
-
-                    for i in range(m-1):
-                        self.hist[g].divide(new_p,par[2],min_size)
+                # get code from ants_130811
 
             else:
                 log_string = 'testing'
                 print ".",
-                # create list of enablers [access sites]
-                a_list = []
-                b_list = []
-                merge_chance = (random.randint(0,100) < self.param[14])
 
-                # create lists for each move type
-                # cell[0] = index of target cell, cell[1] = direction, cell[2] = index of enabling cell
-                for j in range(len(self.hist[g-1].val)):
-                    if self.hist[g-1].val[j][0] == 0:
-                        
-                        neighbors = self.hist[g-1].neighbors(j, no_states,  include_other_parcels = merge_chance )
+                # get target parcel
+                p_list = self.hist[g-1].parcel_list()
+                p_target = random.randint(0,len(p_list)-1)
+
+                # overall loop
+                keep_looking = True
+                if keep_looking:
+                    c_list = p_list[p_target]
+
+                    # find c_target
+                    c_target = -1
+                    for i in c_list:
+                        if self.hist[g-1].val[i][0] == 0:
+                            neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
                 
-                        street_count = len(neighbors[1])
-                        access_count = len(neighbors[2])
-                        built_count = len(neighbors[3])
-                        os_count = len(neighbors[4])
-            
-                        if street_count > 1 : 
-                            b_list.append([j,-1,-1])
-                        elif (street_count > 0) :
-                            p = random.choice(neighbors[1])
-                            #if (random.uniform(0.0,1.0) < prob) : 
-                            b_list.append([j,p[1],p[0]])
-                            #else: 
-                            a_list.append([j,p[1],p[0]])
-                        elif (access_count > 0) :
-                            p = random.choice(neighbors[2])
-                            #if (random.uniform(0.0,1.0) < prob) : 
-                            b_list.append([j,p[1],p[0]])
-                            #else: 
-                            a_list.append([j,p[1],p[0]])
-                        elif (built_count > 0) and (os_count > 0):
-                            p = random.choice(neighbors[3]) 
-                            b_list.append([j,p[1],p[0]])              
+                            street_count = len(neighbors[1])
+                            access_count = len(neighbors[2])
+                            built_count = len(neighbors[3])
+                            os_count = len(neighbors[4])
 
-                if (len(a_list) == 0) and (len(b_list) == 0) : 
-                    self.log.append('no more building sites')
-                    break
+                            if (access_count + street_count) > 0 : 
+                                p = random.choice(neighbors[1]+neighbors[2])
+                                c_target = [i,p[0],p[1]]
+                                # [0] = index of target cell, [1] = index of enabling cell,[2] = direction, cell
 
-                # create iterator lists - select_a and/or select_b
-                # this allows selection of one-at-a-time or all-at-once
-                if (self.param[3] == 0) or ((self.param[2] ==1) and (g == 1)) :
-                    select_a = a_list
-                    select_b = b_list
-                else:
-                    select_a = []
-                    select_b = []
-                    if (random.uniform(0.0,1.0) > prob) and len(a_list) > 0: select_a = [random.choice(a_list)]
-                    elif len(b_list) > 0: select_b = [random.choice(b_list)]
+                    # check if c_target is found
+                    if c_target != -1:
 
-                # perform operation A
-                for cell in select_a:
-                    log_string = 'a '+str(cell[0])+" ; "+str(cell[1])
+                        # place a built unit
+                        print "working on ", c_target," in parcel ",p_target,": placing ",
 
-                    # check if a different parcel
-                    to_parcel = self.hist[g-1].val[cell[0]][3]
-                    from_parcel = self.hist[g-1].val[cell[2]][3]
+                        # initialize
+                        depth = self.hist[g-1].cell[c_target[0]][c_target[2]%2]
+                        placed = False
 
-                    if (merge_chance) and (to_parcel > -1) and (from_parcel > -1) :
-                        # merge the cells!
-                        log_string = log_string +' merge'
-                        for p in range(len(self.hist[g-1].val)):
-                            if self.hist[g-1].val[p][3] == from_parcel: self.hist[g].val[p][3] = to_parcel
+                        # loop
+                        while not placed:
+                            if (random.randint(0,100) < self.param[0]) :
+                                # perform operation B
+                                print " built"
+                                if depth >= 4*min_size: 
+                                    new_size = 2*min_size
+                                    new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
+                                else:
+                                    new_cell = c_target[0]
+                                self.hist[g].val[new_cell][0:3] = [3,-1,0]
+                                placed = True
+                            else:
+                                # perform operation A                            
+                                print " access,",
 
+                        keep_looking = False
 
-                    # continue
-                    if (self.hist[g-1].cell[cell[0]][0] <= 2*min_size) or (self.hist[g-1].cell[cell[0]][1] <= 2*min_size):
-                        self.hist[g].val[cell[0]][0:3] = [2,-1,0]
                     else:
-                        # find access in neighborhood
-                        for n in self.hist[g-1].link[cell[0]]:
-                            if (self.hist[g-1].val[n][0] == 1) or (self.hist[g-1].val[n][0] == 2): 
-                                if self.hist[g-1].direction(n,cell[0]) == cell[1]:
-                                    k = n
-                        # compare center points of cells
-                        if cell[1]%2 == 0:
-                            if self.hist[g-1].pts[k][1] > self.hist[g-1].pts[cell[0]][1]: new_dir = 1
-                            else: new_dir = 3
+                        # no access enabled sites
+                        print "no access-enabled sites :",
+
+                        if (random.randint(0,100) < self.param[14]) :
+                            # parcel merge
+                            print " merging parcels"
+
                         else:
-                            if self.hist[g-1].pts[k][0] > self.hist[g-1].pts[cell[0]][0]: new_dir = 2
-                            else: new_dir = 0
-
-                        # carve out the new increment
-                        d_new = cell[1]%4
-                        depth = self.hist[g].cell[cell[0]][d_new%2]
-                        if depth >= 4*min_size: 
-                            new_size = 2*min_size
-                            new_cell = self.hist[g].divide(cell[0], d_new, new_size)
-                        else:
-                            new_cell = cell[0]
-                        new_access = self.hist[g].divide(new_cell, new_dir, min_size)
-                        self.hist[g].val[new_access][0:3] = [2,-1,0]
-
-                # perform operation B
-                for cell in select_b:
-                    log_string = 'b '+str(cell[0])+" ; "+str(cell[1])
-
-                    # check if a different parcel
-                    to_parcel = self.hist[g-1].val[cell[0]][3]
-                    from_parcel = self.hist[g-1].val[cell[2]][3]
-
-                    #if (to_parcel != from_parcel) and (from_parcel > -1):
-                    if (merge_chance) and (to_parcel > -1) and (from_parcel > -1) :
-                        # merge the cells!
-                        log_string = log_string +' merge'
-                        for p in range(len(self.hist[g-1].val)):
-                            if self.hist[g-1].val[p][3] == from_parcel: self.hist[g].val[p][3] = to_parcel
-
-                    # continue
-
-                    if (cell[1] == -1) or (self.hist[g-1].cell[cell[0]][0] <= 2*self.param[4]) or (self.hist[g-1].cell[cell[0]][1] <= 2*self.param[4]):
-                        self.hist[g].val[cell[0]][0:3] = [3,-1,0]
-                    else:
-                        # carve out the new increment
-                        d_new = cell[1]
-                        depth = self.hist[g].cell[cell[0]][d_new%2]
-                        if depth >= 4*min_size: 
-                            new_size = 2*min_size
-                            new_cell = self.hist[g].divide(cell[0], d_new, new_size)
-                        else:
-                                new_cell = cell[0]
-                        self.hist[g].val[new_cell][0:3] = [3,-1,0]
+                            # building up
+                            print " add vertical addition"
+                            keep_looking = False
 
 #            print log_string                    
             self.log.append(log_string)            

@@ -170,6 +170,9 @@ else:
 #    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
     r.from_csv(init_fname,base_path)
 
+p = r.parcel_list()
+
+
 if out_fname != "":
     r.to_csv(out_fname,base_path)
 
