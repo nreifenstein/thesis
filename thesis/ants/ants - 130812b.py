@@ -224,7 +224,8 @@ class Graph():
             if dx < 0 : return 2
             else: return 0
         return -1
-          
+
+           
     def neighbor(self, i,j, neighborhood_type = 1, epsilon = .01):
         if i == j : return False                   
         p1 = self.pts[i]
@@ -367,6 +368,7 @@ class Graph():
             val = self.val[i]
             r.set_color(color_dict[val[0]][int(val[2])])
             recs.append(r)
+
 
         print "putting rectangles, ",
         if draw_recs : svg_out.put(recs)
@@ -677,6 +679,8 @@ class History():
         no_states = len(self.state_dict)
 
         while g < gen:
+            if g == 17:
+                print
             # add new generation
             self.add_gen()
             if parcel_mode:
@@ -693,13 +697,14 @@ class History():
                 p_list = self.hist[g-1].parcel_list()
                 p_target = random.randint(0,len(p_list)-1)
 
-                # loop through p_list
-                a_list = []
-                b_list = []
-                for parcel in p_list:
+                # overall loop
+                keep_looking = True
+                if keep_looking:
+                    c_list = p_list[p_target]
+
                     # find target cell : c_target
                     c_target = -1
-                    for i in parcel:
+                    for i in c_list:
                         if self.hist[g-1].val[i][0] == 0:
                             neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
                 
@@ -711,18 +716,10 @@ class History():
                             if (access_count + street_count) > 0 : 
                                 p = random.choice(neighbors[1]+neighbors[2])
                                 c_target = [i,p[0],p[1]]
-                                # [0] = index of target cell, [1] = index of enabling cell,[2] = direction
+                                # [0] = index of target cell, [1] = index of enabling cell,[2] = direction, cell
 
                     # check if c_target is found
-                    if c_target == -1:
-                        if parcel != [] : b_list.append(parcel)
-                    else:
-                        a_list.append(c_target)
-
-                # check to see if a_list is empty
-                if len(a_list) > 0:
-                        c_target = random.choice(a_list)
-                        p_target = self.hist[g-1].val[c_target[0]][3]
+                    if c_target != -1:
 
                         # place a built unit
                         print "working on ", c_target," in parcel ",p_target,": placing ",
@@ -783,11 +780,12 @@ class History():
                                     depth = depth-min_size
                                     c_target[1] = new_access
 
-                else:
+
+                        keep_looking = False
+
+                    else:
                         # no access enabled sites
                         print "no access-enabled sites :",
-                        c_list = random.choice(b_list)
-                        p_target = self.hist[g-1].val[c_list[0]][3]
 
                         if (random.randint(0,100) < self.param[14]) :
                             # parcel merge
@@ -818,6 +816,10 @@ class History():
                                 if (self.hist[g-1].val[i][0] == 3):
                                     self.hist[g].val[i][0] = 5
                                     break
+#                                if (self.hist[g-1].val[i][0] == 3) and (self.hist[g-1].val[i][2] < 5):
+#                                    self.hist[g].val[i][2] += 1
+                            keep_looking = False
+
 #            print log_string                    
             self.log.append(log_string)            
             g += 1
@@ -834,41 +836,6 @@ class History():
             if i % self.param(6) == 0:
                 img = g.to_image(size,self.color_dict)
                 img.save(fname+str(i), base_path, True)
-
-    def write_parcels(self, fname="out", base_path=os.path.expanduser("~") + os.sep, gen = 0):
-        print "writing to ",fname+'%03d'%gen+"_p.csv"
-        np = len(self.state_dict)
-        fout = open(base_path + os.sep + fname+'%03d'%gen+"_p.csv",'w')
-        out_string = "parcel, total area, footprint,coverage,total built,far"
-        fout.write(out_string+'\n')
-        parcels = self.hist[gen].parcel_list()
-        total_area = 0
-        total_built = 0
-        total_footprint = 0
-        for i,parcel in enumerate(parcels):
-            area = 0
-            built = 0
-            footprint = 0
-            for j in parcel:
-                cell_area = self.hist[gen].cell[j][0]*self.hist[gen].cell[j][1]
-                area += cell_area
-                if self.hist[gen].val[j][0] == 3:
-                    built += cell_area * 1.5
-                    footprint += cell_area
-                if self.hist[gen].val[j][0] == 5:
-                    built += cell_area * 3
-                    footprint += cell_area
-            if area > 0:
-                out_string = str(i)+','+str(area)+','+str(footprint)+','+str(round(footprint/area,2))+','+str(built)+','+str(round(built/area,2))
-                fout.write(out_string+'\n')
-            total_area += area
-            total_built += built
-            total_footprint += footprint
-        out_string = ','+str(total_area)+','+str(total_footprint)+','+str(round(total_footprint/total_area,2))+','+str(total_built)+','+str(round(total_built/total_area,2))
-        fout.write(out_string+'\n')
-
-        fout.close()
-
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500)):
 

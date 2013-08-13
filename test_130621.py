@@ -190,6 +190,8 @@ t.generate(no_gen)
 t.write_svgs(f_name,path, display_size)
 t.hist[-1].neighbors(13,len(state_dict))
 t.hist[-1].to_csv(f_name,path)
+t.write_parcels(f_name,path)
+t.write_parcels(f_name,path, len(t.hist)-1)
 
 
 def a_count(v,i,a):
