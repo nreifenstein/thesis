@@ -37,6 +37,8 @@ param[16] = 1                           # p16 : plot parcels (0 = no; 1 = yes)
 param[17] = 0                           # p17 : allow emergent alleys (0 = no; 1 = yes)
 param[18] = 0                           # p18 : develop parcels (0 = no; 1 = yes)
 param[19] = 12                          # p19 : size of min. parcel increment
+param[20] = 75                          # p20 : chance of extending access, if possible
+param[21] = 0                           # p21 : continue into vertical / merge (0 = no; 1 = yes)
     
 no_gen = 10
 
