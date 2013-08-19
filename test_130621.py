@@ -39,6 +39,9 @@ param[18] = 0                           # p18 : develop parcels (0 = no; 1 = yes
 param[19] = 12                          # p19 : size of min. parcel increment
 param[20] = 75                          # p20 : chance of extending access, if possible
 param[21] = 0                           # p21 : continue into vertical / merge (0 = no; 1 = yes)
+param[22] = .5                          # p22 : maximum lot coverage (built_footprint / site_area)
+param[23] = 2                           # p23 : maximum floors as vertical additions
+param[24] = 1                           # p24 : show floors in output
     
 no_gen = 10
 
@@ -174,7 +177,8 @@ else:
 
 p = r.parcel_list()
 
-
+footprint = r.parcel_fp(p[0], len(state_dict))
+floor_area = r.parcel_flr(p[0], len(state_dict))
 if out_fname != "":
     r.to_csv(out_fname,base_path)
 

@@ -368,31 +368,6 @@ class Graph():
             result[self.val[c][0]] += a
         return result
 
-    def best_choice(self,cells, no_vals = 2, max_coverage = .5):
-        result = [[],[]]
-        best_area = [0, 575]
-        fp = self.parcel_fp(cells, no_vals)
-        pa = a_sum(fp)
-        fpa = a_sum(fp,[0,0,0,1,0,1])
-        coverage = fpa / pa
-        for i in cells:
-            v = self.val[i]
-            area = self.cell[i][0] * self.cell[i][1]
-            if (v[0] == 0) and area > best_area[0] and coverage < max_coverage:
-                neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
-                
-                street_count = len(neighbors[1])
-                access_count = len(neighbors[2])
-
-                if (access_count + street_count) > 0 : 
-                    p = random.choice(neighbors[1]+neighbors[2])
-                    result[0] = [i,p[0],p[1]]
-                    best_area[0] = area
-            elif (v[0] == 3) and area > best_area[1]:
-                result[1] = [i,-1,-1]
-                best_area[1] = area
-        return result
-
     def to_dc_svg(self,f_name="svg_out", path = os.path.expanduser("~"), color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
         # this uses Decodes. OK for nodes and link, slow for cells.
         svg_out = dc.makeOut(dc.Outies.SVG, f_name, path, canvas_dimensions=cdim, flip_y = False)
@@ -481,7 +456,7 @@ class Graph():
         self.link = link
         self._res = len(val)
 
-    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}, parcels = True, cells = True, floors = False):
+    def to_svg(self,f_name="svg_out", f_path= os.path.expanduser("~"), cdim=Interval(500,500), color_dict = {0:Color(0.0),1:Color(1.0)},state_dict = {0:'none',1:'something'}, parcels = True, cells = True):
         # quick and dirty svg writer
 #        ht = cdim.b
         filepath = f_path + os.sep + f_name+".svg"
@@ -561,8 +536,7 @@ class Graph():
                     pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
                     val = self.val[k]
 
-                    #col = color_dict[val[0]][int(val[2])]
-                    col = color_dict[val[0]][0]
+                    col = color_dict[val[0]][int(val[2])]
 
                     if val[0] == 3:
                         sw = str(1)
@@ -574,12 +548,6 @@ class Graph():
                     point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
                     atts = 'points="'+point_string+'"'
                     buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
-                    if ((val[0] == 3) or (val[0]==5)) and floors:
-                        string = '<text transform="matrix(1 0 0 1 '+str(pts[3][0])+' '+str(pts[3][1])+')" fill="#FFFFFF"'
-                        string = string + ' font-size="16">'+str(val[2]+1)+'</text>\n'
-                        #string = string + ' font-family="'+"'Futura'"+'" font-size="24">'+str(val[2]+1)+'</text>\n'
-                        buffer.write(string)
-
             buffer.write('</g>\n')
 
         # write parcel edges
@@ -758,11 +726,26 @@ class History():
                 b_list = []
                 for parcel in p_list:
                     # find target cell : c_target
-                    r = self.hist[g-1].best_choice(parcel, no_states, self.param[22])
-                    if r[0] != []:
-                        a_list.append(r[0])
-                    elif r[1] != []:
-                        b_list.append(r[1])
+                    c_target = -1
+                    for i in parcel:
+                        if self.hist[g-1].val[i][0] == 0:
+                            neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
+                
+                            street_count = len(neighbors[1])
+                            access_count = len(neighbors[2])
+                            built_count = len(neighbors[3])
+                            os_count = len(neighbors[4])
+
+                            if (access_count + street_count) > 0 : 
+                                p = random.choice(neighbors[1]+neighbors[2])
+                                c_target = [i,p[0],p[1]]
+                                # [0] = index of target cell, [1] = index of enabling cell,[2] = direction
+
+                    # check if c_target is found
+                    if c_target == -1:
+                        if parcel != [] : b_list.append(parcel)
+                    else:
+                        a_list.append(c_target)
 
                 # check to see if a_list is empty
                 if len(a_list) > 0:
@@ -884,9 +867,8 @@ class History():
 
                             # find c_target that is built
                             for i in c_list:
-                                if (self.hist[g-1].val[i][0] == 3) or (self.hist[g-1].val[i][0] == 5):
-                                    if self.hist[g-1].val[i][2] >= self.param[23]: self.hist[g].val[i][0] = 5
-                                    self.hist[g].val[i][2] = 1 + self.hist[g-1].val[i][2]
+                                if (self.hist[g-1].val[i][0] == 3):
+                                    self.hist[g].val[i][0] = 5
                                     break
 #            print log_string                    
             self.log.append(log_string)            
@@ -917,17 +899,27 @@ class History():
         total_footprint3 = 0
         total_footprint5 = 0
         for i,parcel in enumerate(parcels):
-            fp = self.hist[gen].parcel_fp(parcel,np)
-            ba = self.hist[gen].parcel_flr(parcel,np)
-            area = a_sum(fp)
-            built = a_sum(ba,[0,0,0,1,0,1])
+            area = 0
+            built = 0
+            footprint3 = 0
+            footprint5 = 0
+            for j in parcel:
+                cell_area = self.hist[gen].cell[j][0]*self.hist[gen].cell[j][1]
+                area += cell_area
+                if self.hist[gen].val[j][0] == 3:
+                    built += cell_area * 1.5
+                    footprint3 += cell_area
+                if self.hist[gen].val[j][0] == 5:
+                    built += cell_area * 3
+                    footprint5 += cell_area
             if area > 0:
-                out_string = str(i)+','+str(area)+','+str(fp[3])+','+str(fp[5])+','+str(round((fp[3]+fp[5])/area,2))+','+str(built)+','+str(round(built/area,2))
+                footprint = footprint3 + footprint5
+                out_string = str(i)+','+str(area)+','+str(footprint3)+','+str(footprint5)+','+str(round(footprint/area,2))+','+str(built)+','+str(round(built/area,2))
                 fout.write(out_string+'\n')
             total_area += area
             total_built += built
-            total_footprint3 += fp[3]
-            total_footprint5 += fp[5]
+            total_footprint3 += footprint3
+            total_footprint5 += footprint5
         total_footprint = total_footprint3 + total_footprint5
         out_string = ','+str(total_area)+','+str(total_footprint3)+','+str(total_footprint5)+','+str(round(total_footprint/total_area,2))+','+str(total_built)+','+str(round(total_built/total_area,2))
         fout.write(out_string+'\n')
@@ -936,14 +928,12 @@ class History():
 
 
     def write_svgs(self,fname="out", base_path=os.path.expanduser("~") + os.sep, size = Interval(500,500)):
-        parcels = (self.param[16] == 1)
-        cells = (self.param[15] == 1)
-        floors = (self.param[24] == 1)
+
         for i,g in enumerate(self.hist):
             if (i%self.param[6] == 0) or (i+1== len(self.hist)):
-                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict, parcels, cells, floors)
+                g.to_svg(fname+'%03d'%i, base_path,size,self.color_dict,self.state_dict, parcels = (self.param[16] == 1), cells = (self.param[15] == 1))
         for k in range(100//self.param[5]):
-            g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.state_dict, parcels, cells, floors)
+            g.to_svg(fname+'%03d'%i+str(k), base_path,size,self.color_dict,self.state_dict, parcels = (self.param[16] == 1), cells = (self.param[15] == 1))
         if len(self.state_dict) != 0:
             print "writing to ",fname+"_m.csv"
             np = len(self.state_dict)
