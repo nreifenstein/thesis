@@ -368,7 +368,7 @@ class Graph():
             result[self.val[c][0]] += a
         return result
 
-    def best_choice(self,cells, no_vals = 2, max_coverage = .5, min_size = 12, max_ht = 2):
+    def best_choice(self,cells, no_vals = 2, max_coverage = .5, min_size = 12):
         # [0] : largest potential access site - could be any size
         # [1] : largest potential building site > 24 x 24
         # [2] : largest built site - for vertical addition
@@ -393,7 +393,7 @@ class Graph():
                     result[0] = [i,p[0],p[1]]
                     best_area[0] = area
                     if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
-            elif (v[0] == 3) and (v[2] < max_ht) and (area > best_area[2]):
+            elif (v[0] == 3):
                 result[2] = [i,-1,-1]
                 best_area[2] = area
         return result
@@ -744,8 +744,8 @@ class History():
         while g < gen:
             # add new generation
             self.add_gen()
-            if g == 28:
-                print
+            #if g == 28:
+                #print
             if parcel_mode:
                 log_string = 'parcelizing'
                 print "p",
@@ -780,7 +780,7 @@ class History():
                         if build and b_list == [] : build = False
 
                         if build : 
-                            c_target = random.choice(b_list+c_list)
+                            c_target = random.choice(b_list)
                         else:
                             c_target = random.choice(a_list)
 
@@ -804,33 +804,26 @@ class History():
 #                            proper_size = ((depth >= 2*min_size)) and ((width >= 2*min_size))
                             if build :
                                 # perform operation B
-                                print " built",
-                                if self.hist[g].val[c_target[0]][0] == 3:
-                                    # vertical addition
-                                    print " vertical"
-                                    self.hist[g].val[c_target[0]][2] += 1
+                                print " built"
+                                if depth >= 4*min_size: 
+                                    new_size = 2*min_size
+                                    new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
                                 else:
-                                    print "horizontal"
-                                    if depth >= 4*min_size: 
-                                        new_size = 2*min_size
-                                        new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
-                                    else:
-                                        new_cell = c_target[0]
-                                    if width >= 3*min_size:
-                                        new_width = new_cell
-                                        new_size = 2*min_size
-                                        new_cell = self.hist[g].divide(new_width, w_dir, new_size)
-                                        self.hist[g].val[new_width][1] = g+1
-                                    if width > min_size:
-                                        self.hist[g].val[new_cell][0:3] = [3,g+1,0]
-                                    else: self.hist[g].val[new_cell][0:3] = [4,g+1,0]
+                                    new_cell = c_target[0]
+                                if width >= 3*min_size:
+                                    new_width = new_cell
+                                    new_size = 2*min_size
+                                    new_cell = self.hist[g].divide(new_width, w_dir, new_size)
+                                if width > min_size:
+                                    self.hist[g].val[new_cell][0:3] = [3,g,0]
+                                else: self.hist[g].val[new_cell][0:3] = [4,g,0]
                                 placed = True
                             else:
                                 # perform operation A                            
                                 print " access,",
                                 if (depth == min_size) or (width == min_size):
                                     # if too small, make it access
-                                    self.hist[g].val[c_target[0]][0:3] = [2,g+1,0]
+                                    self.hist[g].val[c_target[0]][0:3] = [2,g,0]
                                     placed = True
                                 else:
                                     # carve out access piece
@@ -850,8 +843,8 @@ class History():
                                     if width > min_size:
                                         new_access = self.hist[g].divide(new_cell, w_dir, min_size)
                                     else: new_access = new_cell
-                                    self.hist[g].val[new_access][0:3] = [2,g+1,0]
-                                    self.hist[g].val[new_cell][0:3] = [new_val,g+1,0]
+                                    self.hist[g].val[new_access][0:3] = [2,g,0]
+                                    self.hist[g].val[new_cell][0:3] = [new_val,g,0]
                                     #placed = True
                                     # select new candidate cells
                                     p_list = self.hist[g].parcel_list()
@@ -880,14 +873,10 @@ class History():
                             print " terminating"
                             self.log.append('terminating')
                             break
-                        #d_list = random.choice(c_list)
-                        #p_target = self.hist[g-1].val[d_list[0]][3]
-
+                        d_list = random.choice(c_list)
+                        p_target = self.hist[g-1].val[d_list[0]][3]
 
                         if (random.randint(0,100) < self.param[14]) :
-                            p_target = random.randint(0,len(p_list))
-                            d_list = p_list[p_target]
-
                             # parcel merge
                             print " merging parcels"
 
@@ -909,55 +898,14 @@ class History():
 
                         else:
                             # building up
-                            print " replace"
+                            print " add vertical addition"
 
-                            # find possible site for building up
-                            z_list = []
-                            p_list = self.hist[g].parcel_list()
-                            for p in p_list:
-                                a = self.hist[g].parcel_fp(p, no_states)
-                                if a[5] == 0:
-                                    z_list.append(p)
-
-                            # select parcel
-                            if z_list == []:
-                                self.log.append('terminating')
-                                break
-                            else:
-                                d_list = random.choice(z_list)
-
-                            # replacement building
-                            tb = self.hist[g].parcel_flr(d_list,no_states)
-                            total_built = a_sum(tb,[0,0,0,1,0,1])
-
-                            # get list of initial cells
-                            init_cells = []
-                            total_footprint = 0
-                            for p in d_list:
-                                if (self.hist[g].val[p][1] == 0):
-                                    if (self.hist[g].val[p][0] == 3):
-                                        init_cells.append(p)
-                                        total_footprint += self.hist[g-1].cell[p][0] * self.hist[g-1].cell[p][1]
-                                    else:
-                                        self.hist[g].val[p][0:3] = [4,g+1,0]
-                                else:
-                                    self.hist[g].val[p][0:3] = [0,g+1,0]
-
-                            # set new building
-                            if init_cells == []:
-                                self.log.append('terminating')
-                                break
-                            else:
-                                new_floors = int(1+ ((total_built+600)/total_footprint))
-                                for p in init_cells:
-                                    self.hist[g].val[p][0:3] = [5,g+1,new_floors]
-
-                            
-                            #for i in c_list:
-                                #if (self.hist[g-1].val[i][0] == 3) or (self.hist[g-1].val[i][0] == 5):
-                                    #if self.hist[g-1].val[i][2] >= self.param[23]: self.hist[g].val[i][0] = 5
-                                    #self.hist[g].val[i][2] = 1 + self.hist[g-1].val[i][2]
-                                    #break
+                            # find c_target that is built
+                            for i in c_list:
+                                if (self.hist[g-1].val[i][0] == 3) or (self.hist[g-1].val[i][0] == 5):
+                                    if self.hist[g-1].val[i][2] >= self.param[23]: self.hist[g].val[i][0] = 5
+                                    self.hist[g].val[i][2] = 1 + self.hist[g-1].val[i][2]
+                                    break
 #            print log_string                    
             self.log.append(log_string)            
             g += 1
