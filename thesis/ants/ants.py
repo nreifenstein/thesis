@@ -393,16 +393,16 @@ class Graph():
 #            print
         fpa = a_sum(fp,[0,0,0,1,0,1])
         coverage = fpa / pa
-        for i in cells:
-            if (self.val[i][0] == 4):
-                neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
-                street_count = len(neighbors[1])
-                access_count = len(neighbors[2])
-                if (street_count == 0) and (access_count > 0):
-                    self.val[i][0] = 2
+#        for i in cells:
+#            if (self.val[i][0] == 4):
+#                neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
+#                street_count = len(neighbors[1])
+#                access_count = len(neighbors[2])
+#                if (street_count == 0) and (access_count > 0):
+#                    self.val[i][0] = 2
 
-        for i in cells:
-            if (pa > min_lot):
+        if (pa > min_lot):
+            for i in cells:            
                 v = self.val[i]
                 area = self.cell[i][0] * self.cell[i][1]
                 min_dim = min(self.cell[i][0],self.cell[i][1])
@@ -411,13 +411,26 @@ class Graph():
                     neighbors = self.neighbors(i, no_vals, include_other_parcels = False)                
                     street_count = len(neighbors[1])
                     access_count = len(neighbors[2])
-
+                    # check if any building sites would remain
+                    valid = False
+                    if max(self.cell[i][0],self.cell[i][1]) >= 36:
+                        valid = True
+                    else:
+                        for j in cells:
+                            if i != j:
+                                if (j in self.link[i]) and (self.val[j][0] == 0) and (min(self.cell[j][0],self.cell[j][0]) >=24):
+                                    valid = True
                     if (access_count + street_count) > 0 : 
-                        p = random.choice(neighbors[1]+neighbors[2])
-                        result[0] = [i,p[0],p[1]]
-                        best_area[0] = area
-                        if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
-                elif (v[0] == 3) and (v[2] < max_ht) and (area > best_area[2]):
+                        if valid:
+                            p = random.choice(neighbors[1]+neighbors[2])
+                            result[0] = [i,p[0],p[1]]
+                            best_area[0] = area
+                            if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
+                        elif (area > best_area[1]) and (min_dim > min_size):
+                            p = random.choice(neighbors[1]+neighbors[2])
+                            result[1] = [i,p[0],p[1]]
+                            best_area[1] = area
+                if (v[0] == 3) and (v[2] < max_ht) and (v[1] == 0) and (area > best_area[2]):
                     result[2] = [i,-1,-1]
                     best_area[2] = area
         # check lot coverage
@@ -584,9 +597,9 @@ class Graph():
                 if layer_list[val[0]] == -1 :
                     layer_list[val[0]] = [k]
                 else:
-                    if val[3] == 0:
-                        layer_list[val[0]].append(k)
-                    #layer_list[val[0]].append(k)
+                    #if val[3] == 0:
+                        #layer_list[val[0]].append(k)
+                    layer_list[val[0]].append(k)
 
 # write cells        
         for n in range(len(layer_list)):          
@@ -805,12 +818,21 @@ class History():
                             else:
                                 dir = (c[1]+2)%4
                                 new_cell = self.hist[g-1].divide(i,dir, min_size)
+                                #print "making OS"
                                 self.hist[g-1].val[new_cell][0:3] = [4,0,0]
 
+            # turn OS into access
+            for i in range(len(self.hist[g-1].val)):
+                if (self.hist[g-1].val[i][0] == 4):
+                    neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
+                    street_count = len(neighbors[1])
+                    access_count = len(neighbors[2])
+                    if (street_count == 0) and (access_count > 0):
+                        self.hist[g-1].val[i][0] = 2
 
             self.add_gen()
-            if g == 28:
-                print
+#            if g == 11:
+#                print
             if parcel_mode:
                 log_string = 'parcelizing'
                 print "p",
@@ -832,12 +854,13 @@ class History():
                 c_list = []
                 for parcel in p_list:
                     # find target cell : c_target
-                    r = self.hist[g-1].best_choice(parcel, no_states, self.param)
-                    if r[0] != []:
-                        a_list.append(r[0])
-                        if r[1] != [] : b_list.append(r[1])
-                    elif r[2] != []:
-                        c_list.append(r[2])
+                    if parcel != []:
+                        r = self.hist[g-1].best_choice(parcel, no_states, self.param)
+                        if r[0] != []:
+                            a_list.append(r[0])
+                            if r[1] != [] : b_list.append(r[1])
+                        elif r[2] != []:
+                            c_list.append(r[2])
 
                 print "gen ",g,": a_list:",len(a_list)," b_list:",len(b_list)," c_list:",len(c_list)
                 # check to see if a_list is empty
@@ -891,7 +914,7 @@ class History():
                                         self.hist[g].val[new_width][1] = g+1
                                     if width > min_size:
                                         self.hist[g].val[new_cell][0:3] = [3,g+1,0]
-                                    else: self.hist[g].val[new_cell][0:3] = [4,g+1,0]
+                                    else: self.hist[g].val[new_cell][0:3] = [2,g+1,0]
                                 placed = True
                             else:
                                 # perform operation A                            
@@ -908,7 +931,10 @@ class History():
                                     else:
                                         zone_list = range(1,no_zones+1)
                                         if no_zones-1 in zone_list: zone_list.remove(no_zones-1)
-                                        zones = random.choice(zone_list)
+                                        if self.param[20] > random.randint(0,100):
+                                            zones = zone_list[-1]
+                                        else:
+                                            zones = random.choice(zone_list)
                                         new_size = zones*min_size
                                     if new_size < depth:
                                         new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
@@ -930,6 +956,7 @@ class History():
                                         placed = True
                                     else:
                                         #build = (random.randint(0,100) > self.param[20])
+
                                         build = True
                                         if r[1] == [] : placed = True
                                         if build : 
@@ -953,8 +980,21 @@ class History():
 
 
                         if (random.randint(0,100) < self.param[14]) :
-                            p_target = random.randint(0,len(p_list))
-                            d_list = p_list[p_target]
+                            # make list of parcels that can be merged
+                            m_list = []
+                            for p in p_list:
+                                if p != []:
+                                    fp = self.hist[g].parcel_fp(p, no_states)
+                                    pa = a_sum(fp)
+                                    if pa < self.param[27]: m_list.append(p)
+                            
+                            if len(m_list) == 0:
+                                print " no merges terminating"
+                                self.log.append('terminating')
+                                break
+                            p_target = random.randint(0,len(m_list)-1)
+                            d_list = m_list[p_target]
+
 
                             # parcel merge
                             print " merging parcels"
@@ -1007,6 +1047,7 @@ class History():
                                         init_cells.append(p)
                                         total_footprint += self.hist[g-1].cell[p][0] * self.hist[g-1].cell[p][1]
                                     else:
+                                        print "making it OS"
                                         self.hist[g].val[p][0:3] = [4,g+1,0]
                                 else:
                                     self.hist[g].val[p][0:3] = [0,g+1,0]
@@ -1068,6 +1109,7 @@ class History():
             total_footprint5 += fp[5]
         total_footprint = total_footprint3 + total_footprint5
         out_string = ','+str(total_area)+','+str(total_footprint3)+','+str(total_footprint5)+','+str(round(total_footprint/total_area,2))+','+str(total_built)+','+str(round(total_built/total_area,2))
+        print out_string
         fout.write(out_string+'\n')
 
         fout.close()

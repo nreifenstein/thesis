@@ -44,6 +44,7 @@ param[23] = 2                           # p23 : maximum floors as vertical addit
 param[24] = 1                           # p24 : show floors in output
 param[25] = 5000                        # p25 : minimum lot size for ADU
 param[26] = 1                           # p26 : rear yard setback (0 = no; 1 = yes)
+param[27] = 10000                       # p27 : max parcel merge
     
 no_gen = 10
 
