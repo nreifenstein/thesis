@@ -42,6 +42,8 @@ param[21] = 0                           # p21 : continue into vertical / merge (
 param[22] = .5                          # p22 : maximum lot coverage (built_footprint / site_area)
 param[23] = 2                           # p23 : maximum floors as vertical additions
 param[24] = 1                           # p24 : show floors in output
+param[25] = 5000                        # p25 : minimum lot size for ADU
+param[26] = 1                           # p26 : rear yard setback (0 = no; 1 = yes)
     
 no_gen = 10
 

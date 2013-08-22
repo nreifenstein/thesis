@@ -368,7 +368,17 @@ class Graph():
             result[self.val[c][0]] += a
         return result
 
-    def best_choice(self,cells, no_vals = 2, max_coverage = .5, min_size = 12, max_ht = 2):
+    def best_choice(self,cells, no_vals = 2, param = []):
+        if len(param) > 0:
+            max_coverage = param[22]
+            min_size = param[19]
+            max_ht = param[23]
+            min_lot = param[25]
+        else:
+            min_size = 12
+            max_ht = 2
+            max_coverage = [.5, .5]
+            min_lot = 5000
         # [0] : largest potential access site - could be any size
         # [1] : largest potential building site > 24 x 24
         # [2] : largest built site - for vertical addition
@@ -379,23 +389,34 @@ class Graph():
         fpa = a_sum(fp,[0,0,0,1,0,1])
         coverage = fpa / pa
         for i in cells:
-            v = self.val[i]
-            area = self.cell[i][0] * self.cell[i][1]
-            min_dim = min(self.cell[i][0],self.cell[i][1])
-            if (v[0] == 0) and area > best_area[0] and coverage < max_coverage:
-                neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
+            if (pa > min_lot):
+                v = self.val[i]
+                area = self.cell[i][0] * self.cell[i][1]
+                min_dim = min(self.cell[i][0],self.cell[i][1])
+                if (v[0] == 0) and (area > best_area[0]):
+                    neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
                 
-                street_count = len(neighbors[1])
-                access_count = len(neighbors[2])
+                    street_count = len(neighbors[1])
+                    access_count = len(neighbors[2])
 
-                if (access_count + street_count) > 0 : 
-                    p = random.choice(neighbors[1]+neighbors[2])
-                    result[0] = [i,p[0],p[1]]
-                    best_area[0] = area
-                    if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
-            elif (v[0] == 3) and (v[2] < max_ht) and (area > best_area[2]):
-                result[2] = [i,-1,-1]
-                best_area[2] = area
+                    if (access_count + street_count) > 0 : 
+                        p = random.choice(neighbors[1]+neighbors[2])
+                        result[0] = [i,p[0],p[1]]
+                        best_area[0] = area
+                        if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
+                elif (v[0] == 3) and (v[2] < max_ht) and (v[1] == 0) and (area > best_area[2]):
+                    result[2] = [i,-1,-1]
+                    best_area[2] = area
+        # check lot coverage
+        if result[2] == []:
+            result[0] = []
+            result[1] = []
+        else:
+            z = result[2][0]    # largest building
+            f = self.val[z][2]  # floors for largest building
+            if coverage > max_coverage[f]:
+                result[0] = []
+                result[1] = []
         return result
 
     def to_dc_svg(self,f_name="svg_out", path = os.path.expanduser("~"), color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
@@ -566,8 +587,8 @@ class Graph():
                     pts = [[px-dx,py-dy],[px+dx,py-dy],[px+dx,py+dy],[px-dx,py+dy]]
                     val = self.val[k]
 
-                    #col = color_dict[val[0]][int(val[2])]
-                    col = color_dict[val[0]][0]
+                    col = color_dict[val[0]][int(val[2])]
+                    #col = color_dict[val[0]][0]
 
                     if val[0] == 3:
                         sw = str(1)
@@ -579,11 +600,12 @@ class Graph():
                     point_string = " ".join([str(v[0])+","+str(v[1]) for v in pts])
                     atts = 'points="'+point_string+'"'
                     buffer.write('<polygon '+atts+' style="'+style+'"/>\n')
-                    if ((val[0] == 3) or (val[0]==5)) and floors:
-                        string = '<text transform="matrix(1 0 0 1 '+str(pts[3][0])+' '+str(pts[3][1])+')" fill="#FFFFFF"'
-                        string = string + ' font-size="16">'+str(val[2]+1)+'</text>\n'
-                        #string = string + ' font-family="'+"'Futura'"+'" font-size="24">'+str(val[2]+1)+'</text>\n'
-                        buffer.write(string)
+                    #if ((val[0] == 3) or (val[0]==5)) and floors:
+                        #ht_string = ' '+((val[2]+1) * "|")
+                        #string = '<text transform="matrix(1 0 0 1 '+str(pts[3][0])+' '+str(pts[3][1])+')" fill="#FFFFFF"'
+                        #string = string + ' font-size="16">'+ht_string+'</text>\n'
+                        ##string = string + ' font-family="'+"'Futura'"+'" font-size="24">'+str(val[2]+1)+'</text>\n'
+                        #buffer.write(string)
 
             buffer.write('</g>\n')
 
@@ -743,6 +765,31 @@ class History():
 
         while g < gen:
             # add new generation
+            # create setbacks
+            if (self.param[26] == 1) and (g == 1):
+                # loop through all zones
+                for i in range(len(self.hist[g-1].val)):
+                    if self.hist[g-1].val[i][0] == 0:
+
+                        neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
+                
+                        street_count = len(neighbors[1])
+                        access_count = len(neighbors[2])
+                        built_count = len(neighbors[3])
+                        c = []
+
+                        if built_count > 0:
+                            c = neighbors[3][0]
+                        elif access_count > 0:
+                            c = neighbors[2][0]
+                        elif street_count > 0:
+                            c = neighbors[1][0]
+                        if c != []:
+                            dir = (c[1]+2)%4
+                            new_cell = self.hist[g-1].divide(i,dir, min_size)
+                            self.hist[g-1].val[new_cell][0:3] = [4,0,0]
+
+
             self.add_gen()
             if g == 28:
                 print
@@ -755,6 +802,7 @@ class History():
             else:
                 log_string = 'testing'
                 print g,".",
+               
 
                 # get target parcel
                 p_list = self.hist[g-1].parcel_list()
@@ -766,7 +814,7 @@ class History():
                 c_list = []
                 for parcel in p_list:
                     # find target cell : c_target
-                    r = self.hist[g-1].best_choice(parcel, no_states, self.param[22])
+                    r = self.hist[g-1].best_choice(parcel, no_states, self.param)
                     if r[0] != []:
                         a_list.append(r[0])
                         if r[1] != [] : b_list.append(r[1])
@@ -809,6 +857,7 @@ class History():
                                     # vertical addition
                                     print " vertical"
                                     self.hist[g].val[c_target[0]][2] += 1
+                                    self.hist[g].val[c_target[0]][1] = g
                                 else:
                                     print "horizontal"
                                     if depth >= 4*min_size: 
@@ -856,7 +905,7 @@ class History():
                                     # select new candidate cells
                                     p_list = self.hist[g].parcel_list()
                                     parcel = p_list[p_target]
-                                    r = self.hist[g].best_choice(parcel, no_states, self.param[22])
+                                    r = self.hist[g].best_choice(parcel, no_states, self.param)
                                     if r[0] == []:
                                         # no more minimal sites are left
                                         placed = True
