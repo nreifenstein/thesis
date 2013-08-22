@@ -377,25 +377,38 @@ class Graph():
         else:
             min_size = 12
             max_ht = 2
-            max_coverage = [.5, .5]
+            max_coverage = .4
             min_lot = 5000
         # [0] : largest potential access site - could be any size
         # [1] : largest potential building site > 24 x 24
         # [2] : largest built site - for vertical addition
+        parcel = self.val[cells[0]][3]
+        if parcel == 3:
+            print
         result = [[],[],[]]
         best_area = [0, 575,0]
         fp = self.parcel_fp(cells, no_vals)
         pa = a_sum(fp)
+#        if pa < 5000:
+#            print
         fpa = a_sum(fp,[0,0,0,1,0,1])
         coverage = fpa / pa
+        for i in cells:
+            if (self.val[i][0] == 4):
+                neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
+                street_count = len(neighbors[1])
+                access_count = len(neighbors[2])
+                if (street_count == 0) and (access_count > 0):
+                    self.val[i][0] = 2
+
         for i in cells:
             if (pa > min_lot):
                 v = self.val[i]
                 area = self.cell[i][0] * self.cell[i][1]
                 min_dim = min(self.cell[i][0],self.cell[i][1])
-                if (v[0] == 0) and (area > best_area[0]):
-                    neighbors = self.neighbors(i, no_vals, include_other_parcels = False)
-                
+                coverage = (fpa+576) / pa
+                if (v[0] == 0) and (area > best_area[0]) and (coverage < max_coverage):
+                    neighbors = self.neighbors(i, no_vals, include_other_parcels = False)                
                     street_count = len(neighbors[1])
                     access_count = len(neighbors[2])
 
@@ -404,19 +417,17 @@ class Graph():
                         result[0] = [i,p[0],p[1]]
                         best_area[0] = area
                         if (area > best_area[1]) and (min_dim > min_size) : result[1] = result[0]
-                elif (v[0] == 3) and (v[2] < max_ht) and (v[1] == 0) and (area > best_area[2]):
+                elif (v[0] == 3) and (v[2] < max_ht) and (area > best_area[2]):
                     result[2] = [i,-1,-1]
                     best_area[2] = area
         # check lot coverage
-        if result[2] == []:
-            result[0] = []
-            result[1] = []
-        else:
-            z = result[2][0]    # largest building
-            f = self.val[z][2]  # floors for largest building
-            if coverage > max_coverage[f]:
-                result[0] = []
-                result[1] = []
+        #if result[2] != []:
+            #z = result[2][0]    # largest building
+            #f = self.val[z][2]  # floors for largest building
+            #f = 0
+            #if coverage > max_coverage[f]:
+                #result[0] = []
+                #result[1] = []
         return result
 
     def to_dc_svg(self,f_name="svg_out", path = os.path.expanduser("~"), color_dict = {0:Color(0.0),1:Color(1.0)}, cdim=Interval(500,500), draw_recs=True,draw_nodes=False,draw_link=False):
@@ -573,7 +584,9 @@ class Graph():
                 if layer_list[val[0]] == -1 :
                     layer_list[val[0]] = [k]
                 else:
-                    layer_list[val[0]].append(k)
+                    if val[3] == 0:
+                        layer_list[val[0]].append(k)
+                    #layer_list[val[0]].append(k)
 
 # write cells        
         for n in range(len(layer_list)):          
@@ -785,9 +798,14 @@ class History():
                         elif street_count > 0:
                             c = neighbors[1][0]
                         if c != []:
-                            dir = (c[1]+2)%4
-                            new_cell = self.hist[g-1].divide(i,dir, min_size)
-                            self.hist[g-1].val[new_cell][0:3] = [4,0,0]
+                            depth = int(self.hist[g-1].cell[i][c[1]%2])
+                            width = int(self.hist[g-1].cell[i][(1+c[1])%2])
+                            if depth <= 2*min_size:
+                                self.hist[g-1].val[i][0:3] = [4,0,0]
+                            else:
+                                dir = (c[1]+2)%4
+                                new_cell = self.hist[g-1].divide(i,dir, min_size)
+                                self.hist[g-1].val[new_cell][0:3] = [4,0,0]
 
 
             self.add_gen()
@@ -821,6 +839,7 @@ class History():
                     elif r[2] != []:
                         c_list.append(r[2])
 
+                print "gen ",g,": a_list:",len(a_list)," b_list:",len(b_list)," c_list:",len(c_list)
                 # check to see if a_list is empty
                 if len(a_list) > 0:
 
