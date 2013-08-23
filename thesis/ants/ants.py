@@ -827,12 +827,12 @@ class History():
                     neighbors = self.hist[g-1].neighbors(i, no_states, include_other_parcels = False)
                     street_count = len(neighbors[1])
                     access_count = len(neighbors[2])
-                    if (street_count == 0) and (access_count > 0):
+                    if (street_count == 0) and (access_count > 0) and (self.hist[g-1].val[i][1] > 0):
                         self.hist[g-1].val[i][0] = 2
 
             self.add_gen()
-#            if g == 11:
-#                print
+            if g == 8:
+                print
             if parcel_mode:
                 log_string = 'parcelizing'
                 print "p",
@@ -902,12 +902,19 @@ class History():
                                     self.hist[g].val[c_target[0]][1] = g
                                 else:
                                     print "horizontal"
-                                    if depth >= 4*min_size: 
-                                        new_size = 2*min_size
+                                    if depth < 3*min_size:
+                                        new_cell = c_target[0]
+                                    elif depth >= 4*min_size: 
+                                        z = random.choice([2,2,3])
+                                        new_size = z*min_size
                                         new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
                                     else:
-                                        new_cell = c_target[0]
-                                    if width >= 3*min_size:
+                                        if random.randint(0,100) < 50:
+                                            new_cell = c_target[0]
+                                        else:
+                                            new_size = 2*min_size
+                                            new_cell = self.hist[g].divide(c_target[0], c_target[2], new_size)
+                                    if width >= 4*min_size:
                                         new_width = new_cell
                                         new_size = 2*min_size
                                         new_cell = self.hist[g].divide(new_width, w_dir, new_size)
@@ -948,25 +955,36 @@ class History():
                                     self.hist[g].val[new_cell][0:3] = [new_val,g+1,0]
                                     #placed = True
                                     # select new candidate cells
-                                    p_list = self.hist[g].parcel_list()
-                                    parcel = p_list[p_target]
-                                    r = self.hist[g].best_choice(parcel, no_states, self.param)
-                                    if r[0] == []:
-                                        # no more minimal sites are left
-                                        placed = True
-                                    else:
-                                        #build = (random.randint(0,100) > self.param[20])
-
+                                    if min(self.hist[g].cell[new_cell][0],self.hist[g].cell[new_cell][1]) > 24:
+                                        old_dir = (c_target[2]+2)%4
+                                        c_target[0] = new_cell
+                                        c_target[1] = new_access
+                                        c_target[2] = self.hist[g].direction(new_access,new_cell)
+                                        #w_dir = self.hist[g].portion(c_target[0],c_target[1])
+                                        depth = int(self.hist[g].cell[c_target[0]][c_target[2]%2])
+                                        width = int(self.hist[g].cell[c_target[0]][(1+c_target[2])%2])
+                                        w_dir = old_dir
                                         build = True
-                                        if r[1] == [] : placed = True
-                                        if build : 
-                                            c_target = r[1]
+                                    else:
+                                        p_list = self.hist[g].parcel_list()
+                                        parcel = p_list[p_target]
+                                        r = self.hist[g].best_choice(parcel, no_states, self.param)
+                                        if r[0] == []:
+                                            # no more minimal sites are left
+                                            placed = True
                                         else:
-                                            c_target = r[0]
-                                        if c_target != []:
-                                            depth = int(self.hist[g].cell[c_target[0]][c_target[2]%2])
-                                            width = int(self.hist[g].cell[c_target[0]][(1+c_target[2])%2])
-                                            w_dir = self.hist[g].portion(c_target[0],c_target[1])
+                                            #build = (random.randint(0,100) > self.param[20])
+
+                                            build = True
+                                            if r[1] == [] : placed = True
+                                            if build : 
+                                                c_target = r[1]
+                                            else:
+                                                c_target = r[0]
+                                            if c_target != []:
+                                                depth = int(self.hist[g].cell[c_target[0]][c_target[2]%2])
+                                                width = int(self.hist[g].cell[c_target[0]][(1+c_target[2])%2])
+                                                w_dir = self.hist[g].portion(c_target[0],c_target[1])
 
                 else:
                         # no access enabled sites
