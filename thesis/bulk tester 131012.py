@@ -46,9 +46,7 @@ param[25] = 5000                        # p25 : minimum lot size for ADU
 param[26] = 1                           # p26 : rear yard setback (0 = no; 1 = yes)
 param[27] = 10000                       # p27 : max parcel merge
 param[28] = 1                           # p28 : write svgs (0 = no; 1 = yes)
-param[29] = 2                           # p29 : number of tests [for bulk tester only]
-param[30] = 10.0                        # p30 : maximum FAR
-    
+param[29] = 2                           # p29 : number of tests
 no_gen = 10
 
 
@@ -165,79 +163,83 @@ fout.write('d = '+str(datetime.date.today()))
 fout.close()
 
 ### Main Function
+## make it a loop
+for i in range(0,param[29]-1):
+    s = i*((param[29])-1.0)
+    print
 
-r = Graph()
+    r = Graph()
 
-if init_fname == "":
-    r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
-    if block_size.a == 0:
-        init_r = 30 * [0]
-        init_r[0] = 1
-        r.init_rvals([init_r,[-1],[0]])
+    if init_fname == "":
+        r.init_rectgrid(model_size,include_corners=False,wrap=False,cellsize=1)
+        if block_size.a == 0:
+            init_r = 30 * [0]
+            init_r[0] = 1
+            r.init_rvals([init_r,[-1],[0]])
+        else:
+            r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10], increment = param[11])
+        r.to_csv(f_name,path)
     else:
-        r.init_block(model_size=model_size,block_size=block_size, no_vals = param[10], increment = param[11])
-    r.to_csv(f_name,path)
-else:
-#    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
-    r.from_csv(init_fname,base_path)
+    #    r.init_ppm(init_fname,base_path+'\\maps\\',color_dict)
+        r.from_csv(init_fname,base_path)
 
-p = r.parcel_list()
+    p = r.parcel_list()
 
-footprint = r.parcel_fp(p[0], len(state_dict))
-floor_area = r.parcel_flr(p[0], len(state_dict))
-if out_fname != "":
-    r.to_csv(out_fname,base_path)
+    footprint = r.parcel_fp(p[0], len(state_dict))
+    floor_area = r.parcel_flr(p[0], len(state_dict))
+    if out_fname != "":
+        r.to_csv(out_fname,base_path)
 
 
-t= History(r)
-t.set_dict(color_dict,state_dict)
+    t= History(r)
+    t.set_dict(color_dict,state_dict)
 
-t.set_rule(base_path+'\\rules\\'+rule_fname)
-t.set_vis(base_path+'\\rules\\'+vis_fname)
-t.set_params(param)
+    t.set_rule(base_path+'\\rules\\'+rule_fname)
+    t.set_vis(base_path+'\\rules\\'+vis_fname)
+    t.set_params(param)
 
-t.generate(no_gen)
-
-
-if param[28] == 1 : t.write_svgs(f_name,path, display_size)
-t.hist[-1].neighbors(13,len(state_dict))
-t.hist[-1].to_csv(f_name,path)
-t.write_parcels(f_name,path)
-t.write_parcels(f_name,path, len(t.hist)-1)
+    t.generate(no_gen)
 
 
-def a_count(v,i,a):
-    ret = 0
-    for j in a: 
-        if j[i] == v : ret += 1
-    return ret
+    if param[28] == 1 : t.write_svgs(f_name,path, display_size)
+    t.hist[-1].neighbors(13,len(state_dict))
+    t.hist[-1].to_csv(f_name,path)
+    t.write_parcels(f_name,path)
+    t.write_parcels(f_name,path, len(t.hist)-1)
 
 
-def print_attributes(obj):
-    for attr in obj.__dict__:
-        print attr, getattr(obj, attr)
+    def a_count(v,i,a):
+        ret = 0
+        for j in a: 
+            if j[i] == v : ret += 1
+        return ret
+
+
+    def print_attributes(obj):
+        for attr in obj.__dict__:
+            print attr, getattr(obj, attr)
     
-"""
-temp = []
-if init_fname != "":
+    """
+    temp = []
+    if init_fname != "":
     fin = open(path+"\\"+init_fname)
     line_in = fin.readline()
     temp = eval(line_in)
-if len(temp) == m*n:
+    if len(temp) == m*n:
     props = temp
-else:
+    else:
     props = []
     for i in range(m*n): 
         if random.uniform(0.0,1.0) < .05 :
             props.append([1,0,0])
         else:
             props.append([0,0,0])
-#    props.append(random.choice(range(no_states)))
+    #    props.append(random.choice(range(no_states)))
 
-# Save the initial conditions
-fout = open(path+"\\"+f_prefix+"init.txt",'w')
-fout.write(str(props))
-fout.close()
-"""
+    # Save the initial conditions
+    fout = open(path+"\\"+f_prefix+"init.txt",'w')
+    fout.write(str(props))
+    fout.close()
+    """
 
 raw_input("press enter...")
